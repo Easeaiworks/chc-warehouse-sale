@@ -784,11 +784,25 @@ async function api(endpoint, options = {}) {
 
   const res = await fetch(API + endpoint, { ...options, headers: options.body instanceof FormData ? { 'Authorization': `Bearer ${token}` } : headers });
 
-  if (res.status === 401) {
+  // Only auto-logout for 401 on non-auth endpoints
+  const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
+  if (res.status === 401 && !isAuthEndpoint) {
     logout();
     throw new Error('Session expired');
   }
 
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// Direct fetch for login (bypasses api() helper entirely)
+async function loginFetch(endpoint, body) {
+  const res = await fetch(API + endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body)
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
@@ -817,20 +831,8 @@ async function initApp() {
 async function checkFirstAdmin() {
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('appLayout').style.display = 'none';
-
-  try {
-    // Try to login with empty creds to see if we get a specific error
-    const res = await fetch(API + '/api/admin/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'check@check', password: 'check' })
-    });
-    // If status 401, admins exist. If we get a different response, check further.
-    // We can't easily check admin count without auth, so just show login by default.
-    // The register endpoint handles first-admin detection server-side.
-  } catch (e) {
-    // Network error
-  }
+  // Login screen shows by default. First-admin detection is handled
+  // server-side by the register endpoint — no need to probe here.
 }
 
 async function handleLogin() {
@@ -852,10 +854,7 @@ async function handleLogin() {
 
   try {
     // Try login first
-    const data = await api('/api/admin/auth/login', {
-      method: 'POST',
-      body: { email, password }
-    });
+    const data = await loginFetch('/api/admin/auth/login', { email, password });
 
     token = data.token;
     admin = data.admin;
@@ -865,10 +864,7 @@ async function handleLogin() {
     // If login fails and name field is visible (setup mode), try register
     if (name) {
       try {
-        const data = await api('/api/admin/auth/register', {
-          method: 'POST',
-          body: { email, password, name }
-        });
+        const data = await loginFetch('/api/admin/auth/register', { email, password, name });
 
         token = data.token;
         admin = data.admin;
@@ -881,7 +877,7 @@ async function handleLogin() {
       }
     } else {
       // Show name field for first-time setup
-      if (loginErr.message.includes('Invalid email')) {
+      if (loginErr.message.includes('Invalid email') || loginErr.message.includes('Invalid')) {
         // Could be first admin — show name field
         document.getElementById('loginNameGroup').style.display = 'block';
         document.getElementById('loginSetupMsg').style.display = 'block';
