@@ -116,9 +116,12 @@ app.use(cors({
 }));
 
 // HTTPS enforcement in production (redirect HTTP to HTTPS)
+// Only redirect when x-forwarded-proto header is present (external requests via proxy)
+// Railway's internal healthcheck doesn't set this header, so it passes through
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
-    if (req.headers['x-forwarded-proto'] !== 'https') {
+    const proto = req.headers['x-forwarded-proto'];
+    if (proto && proto !== 'https') {
       return res.redirect(301, `https://${req.headers.host}${req.url}`);
     }
     next();
