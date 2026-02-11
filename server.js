@@ -225,8 +225,8 @@ app.post('/api/admin/auth/register', async (req, res) => {
       .single();
 
     if (error) {
-      console.error('Admin registration error:', error);
-      return res.status(500).json({ error: 'Failed to create admin account' });
+      console.error('Admin registration error:', JSON.stringify(error, null, 2));
+      return res.status(500).json({ error: 'Failed to create admin account: ' + (error.message || error.code || 'unknown error') });
     }
 
     const token = jwt.sign(
