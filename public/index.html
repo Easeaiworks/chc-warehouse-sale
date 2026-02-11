@@ -6,8 +6,7 @@
   <title>CHC Paint - Warehouse Sale 2026</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- EmailJS SDK -->
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <!-- Removed EmailJS SDK — emails now handled server-side -->
   <style>
     .line-through { text-decoration: line-through; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -34,38 +33,11 @@
 
   <script>
     // ========================================
-    // EMAILJS CONFIGURATION
+    // CONFIGURATION (no secrets in client code)
     // ========================================
-    // To enable email sending:
-    // 1. Go to https://www.emailjs.com/ and create a free account
-    // 2. Add an email service (Gmail, Outlook, etc.)
-    // 3. Create an email template with these variables:
-    //    - {{shop_name}}
-    //    - {{customer_email}}
-    //    - {{branch}}
-    //    - {{branch_email}}
-    //    - {{order_items}}
-    //    - {{order_total}}
-    //    - {{order_id}}
-    // 4. Replace the values below with your EmailJS credentials
-    
-    const EMAILJS_CONFIG = {
-      enabled: false,  // Set to true after configuring EmailJS
-      publicKey: 'YOUR_PUBLIC_KEY',      // From EmailJS dashboard
-      serviceId: 'YOUR_SERVICE_ID',      // From EmailJS dashboard
-      templateId: 'YOUR_TEMPLATE_ID'     // From EmailJS dashboard
-    };
+    // Email notifications are handled server-side via Nodemailer.
+    // Password verification is handled server-side via /api/auth/verify.
 
-    // Initialize EmailJS (only if configured)
-    if (EMAILJS_CONFIG.enabled && EMAILJS_CONFIG.publicKey !== 'YOUR_PUBLIC_KEY') {
-      emailjs.init(EMAILJS_CONFIG.publicKey);
-    }
-
-    // ========================================
-    // PASSWORD & BRANCH EMAIL CONFIGURATION
-    // ========================================
-    const CORRECT_PASSWORD = "buyfromchc";
-    
     const BRANCH_EMAILS = {
       "Woodbridge": "woodbridge@chcpaint.com",
       "Markham": "markham@chcpaint.com",
@@ -74,7 +46,7 @@
       "Oakville": "oakville@chcpaint.com",
       "St. Catharines": "stcatharines@chcpaint.com"
     };
-    
+
     let isAuthenticated = sessionStorage.getItem('chc_authenticated') === 'true';
 
     // ========================================
@@ -399,11 +371,13 @@
       isCheckoutOpen: false,
       orderSubmitted: false,
       isSubmitting: false,
+      isAuthenticating: false,
       shopName: "",
       contactEmail: "",
       branch: "",
       toast: null,
       passwordError: false,
+      authErrorMessage: "",
       lastOrderId: null
     };
 
@@ -476,92 +450,79 @@
     }
 
     // ========================================
-    // EMAIL SENDING FUNCTION
+    // ORDER SUBMISSION (server handles email + database)
     // ========================================
-    async function sendOrderEmail(orderId) {
-      const branchEmail = BRANCH_EMAILS[state.branch];
-      
-      // If EmailJS is not configured, just log and return success
-      if (!EMAILJS_CONFIG.enabled || EMAILJS_CONFIG.publicKey === 'YOUR_PUBLIC_KEY') {
-        console.log('EmailJS not configured. Order details:');
-        console.log('To:', branchEmail);
-        console.log('Order ID:', orderId);
-        console.log('Shop:', state.shopName);
-        console.log('Customer Email:', state.contactEmail);
-        console.log('Items:', formatOrderItems());
-        console.log('Total:', formatPrice(getCartTotal()));
-        return { success: true, message: 'Order logged (email not configured)' };
-      }
-
-      // Send via EmailJS
-      try {
-        const templateParams = {
-          to_email: branchEmail,
-          shop_name: state.shopName,
-          customer_email: state.contactEmail,
+    async function submitOrderToBackend() {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopName: state.shopName,
+          email: state.contactEmail,
           branch: state.branch,
-          branch_email: branchEmail,
-          order_id: orderId,
-          order_items: formatOrderItems(),
-          order_total: formatPrice(getCartTotal()),
-          order_count: getCartCount()
-        };
+          items: state.cart,
+          total: getCartTotal()
+        })
+      });
 
-        const response = await emailjs.send(
-          EMAILJS_CONFIG.serviceId,
-          EMAILJS_CONFIG.templateId,
-          templateParams
-        );
-
-        console.log('Email sent successfully:', response);
-        return { success: true, message: 'Email sent successfully' };
-      } catch (error) {
-        console.error('Email sending failed:', error);
-        return { success: false, message: error.message };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit order');
       }
-    }
 
-    // Also submit to backend API
-    async function submitOrderToBackend(orderId) {
-      try {
-        const response = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId,
-            shopName: state.shopName,
-            email: state.contactEmail,
-            branch: state.branch,
-            items: state.cart,
-            total: getCartTotal()
-          })
-        });
-        return await response.json();
-      } catch (error) {
-        console.log('Backend submission failed (this is okay for static hosting):', error);
-        return { success: true };
-      }
+      return await response.json();
     }
 
     // ========================================
-    // PASSWORD CHECK
+    // PASSWORD CHECK (server-side verification)
     // ========================================
-    function checkPassword() {
+    async function checkPassword() {
       const input = document.getElementById('passwordInput');
       const password = input ? input.value : '';
-      
-      if (password === CORRECT_PASSWORD) {
-        isAuthenticated = true;
-        sessionStorage.setItem('chc_authenticated', 'true');
-        state.passwordError = false;
-        render();
-      } else {
+
+      if (!password) {
         state.passwordError = true;
+        state.authErrorMessage = 'Please enter a password.';
         render();
-        setTimeout(() => {
-          const form = document.getElementById('loginForm');
-          if (form) form.classList.add('shake');
-        }, 10);
+        return;
+      }
+
+      state.isAuthenticating = true;
+      state.passwordError = false;
+      state.authErrorMessage = '';
+      render();
+
+      try {
+        const response = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          isAuthenticated = true;
+          sessionStorage.setItem('chc_authenticated', 'true');
+          state.passwordError = false;
+          state.isAuthenticating = false;
+          render();
+        } else {
+          state.passwordError = true;
+          state.isAuthenticating = false;
+          state.authErrorMessage = result.error || 'Incorrect password. Please try again.';
+          render();
+          setTimeout(() => {
+            const form = document.getElementById('loginForm');
+            if (form) form.classList.add('shake');
+          }, 10);
+        }
+      } catch (error) {
+        console.error('Auth error:', error);
+        state.passwordError = true;
+        state.isAuthenticating = false;
+        state.authErrorMessage = 'Connection error. Please try again.';
+        render();
       }
     }
 
@@ -638,24 +599,23 @@
         showToast("Please fill in all fields");
         return;
       }
-      
+
       state.isSubmitting = true;
       render();
 
-      const orderId = generateOrderId();
-      state.lastOrderId = orderId;
-
-      // Send email and submit to backend
-      const [emailResult, backendResult] = await Promise.all([
-        sendOrderEmail(orderId),
-        submitOrderToBackend(orderId)
-      ]);
-
-      state.isSubmitting = false;
-      state.orderSubmitted = true;
-      state.isCheckoutOpen = false;
-      state.isCartOpen = false;
-      render();
+      try {
+        const result = await submitOrderToBackend();
+        state.lastOrderId = result.orderId;
+        state.isSubmitting = false;
+        state.orderSubmitted = true;
+        state.isCheckoutOpen = false;
+        state.isCartOpen = false;
+        render();
+      } catch (error) {
+        state.isSubmitting = false;
+        showToast(error.message || "Failed to submit order. Please try again.");
+        render();
+      }
     }
 
     function resetOrder() {
@@ -752,17 +712,23 @@
                   ${state.passwordError ? `
                     <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
                       <i class="fas fa-exclamation-circle"></i>
-                      Incorrect password. Please try again.
+                      ${state.authErrorMessage || 'Incorrect password. Please try again.'}
                     </p>
                   ` : ''}
                 </div>
                 
-                <button 
+                <button
                   onclick="checkPassword()"
                   class="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                  ${state.isAuthenticating ? 'disabled' : ''}
                 >
-                  <span>Access Catalog</span>
-                  <i class="fas fa-arrow-right"></i>
+                  ${state.isAuthenticating ? `
+                    <i class="fas fa-spinner animate-spin"></i>
+                    <span>Verifying...</span>
+                  ` : `
+                    <span>Access Catalog</span>
+                    <i class="fas fa-arrow-right"></i>
+                  `}
                 </button>
               </div>
             </div>
