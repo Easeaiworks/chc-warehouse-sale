@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CHC Paint - Warehouse Sale 2026</title>
+  <title>CHC Paint - Warehouse Sale</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Removed EmailJS SDK — emails now handled server-side -->
   <style>
     .line-through { text-decoration: line-through; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -33,11 +32,8 @@
 
   <script>
     // ========================================
-    // CONFIGURATION (no secrets in client code)
+    // CONFIGURATION
     // ========================================
-    // Email notifications are handled server-side via Nodemailer.
-    // Password verification is handled server-side via /api/auth/verify.
-
     const BRANCH_EMAILS = {
       "Woodbridge": "woodbridge@chcpaint.com",
       "Markham": "markham@chcpaint.com",
@@ -47,339 +43,230 @@
       "St. Catharines": "stcatharines@chcpaint.com"
     };
 
-    let isAuthenticated = sessionStorage.getItem('chc_authenticated') === 'true';
-
-    // ========================================
-    // PRODUCT DATA - ALL 428 PRODUCTS
-    // ========================================
-    const PRODUCTS = {
-      "3M": {
-        hasCategories: true,
-        categories: {
-          "Abrasives & Sanding": [
-            { sku: "MMM02021", name: "3M Wetordry Abrasive Sheet P1000", previousPrice: "85.99", salePrice: "64.99" },
-            { sku: "MMM02022", name: "3M Wetordry Abrasive Sheet P1200", previousPrice: "74.99", salePrice: "64.99" },
-            { sku: "MMM02023", name: "3M Wetordry Abrasive Sheet P1500", previousPrice: "74.99", salePrice: "64.99" },
-            { sku: "MMM02035", name: "3M Wetordry Abrasive Sheet P800", previousPrice: "85.99", salePrice: "69.99" },
-            { sku: "MMM02036", name: "3M Wetordry Abrasive Sheet P600", previousPrice: "85.99", salePrice: "69.99" },
-            { sku: "MMM02038", name: "3M Wetordry Abrasive Sheet P400", previousPrice: "85.99", salePrice: "69.99" },
-            { sku: "MMM02044", name: "3M Wetordry Abrasive Sheet P2000", previousPrice: "85.99", salePrice: "64.99" },
-            { sku: "MMM02045", name: "3M Wetordry Abrasive Sheet P2500", previousPrice: "85.99", salePrice: "64.99" },
-            { sku: "MMM02085", name: "3M 6in Trizact Hookit Foam Disc P3000", previousPrice: "180.99", salePrice: "139.99" },
-            { sku: "MMM02087", name: "3M 3in Trizact Hookit Foam Disc P3000", previousPrice: "91.99", salePrice: "74.99" },
-            { sku: "MMM30662", name: "3M Trizact Hookit Foam Disc P5000 6in", previousPrice: "159.99", salePrice: "109.99" },
-            { sku: "MMM30666", name: "3M Hookit Purple Finishing Film Disc 6in P2000", previousPrice: "79.99", salePrice: "64.99" },
-            { sku: "MMM31370", name: "3M Cubitron II Hookit Abrasive Disc P40 6in", previousPrice: "95.99", salePrice: "79.99" },
-            { sku: "MMM31371", name: "3M Cubitron II Hookit Abrasive Disc P80 6in", previousPrice: "79.99", salePrice: "59.99" },
-            { sku: "MMM31372", name: "3M Cubitron II Hookit Abrasive Disc P120 6in", previousPrice: "79.99", salePrice: "59.99" },
-            { sku: "MMM31373", name: "3M Cubitron II Hookit Abrasive Disc P150 6in", previousPrice: "79.99", salePrice: "59.99" },
-            { sku: "MMM33538", name: "3M Hookit Flexible Foam Abrasive Disc P400 6in", previousPrice: "52.99", salePrice: "39.99" },
-            { sku: "MMM33539", name: "3M Hookit Flexible Foam Abrasive Disc P600 6in", previousPrice: "52.99", salePrice: "39.99" },
-            { sku: "MMM36170", name: "3M Hookit Blue Disc P40 6in", previousPrice: "58.99", salePrice: "49.99" },
-            { sku: "MMM36172", name: "3M Hookit Blue Disc P80 6in", previousPrice: "63.99", salePrice: "49.99" },
-            { sku: "MMM36174", name: "3M Hookit Blue Disc P120 6in", previousPrice: "58.99", salePrice: "49.99" },
-            { sku: "MMM36176", name: "3M Hookit Blue Disc P180 6in", previousPrice: "58.99", salePrice: "49.99" },
-            { sku: "MMM36180", name: "3M Hookit Blue Disc P320 6in", previousPrice: "58.99", salePrice: "49.99" },
-          ],
-          "Polishing & Compounding": [
-            { sku: "MMM05706", name: "3M Perfect-It Foam Compounding Pad", previousPrice: "63.99", salePrice: "29.99" },
-            { sku: "MMM05707", name: "3M Perfect-It Foam Polishing Pad", previousPrice: "58.99", salePrice: "35.99" },
-            { sku: "MMM05708", name: "3M Perfect-It Ultrafine Foam Polishing Pad", previousPrice: "58.99", salePrice: "39.99" },
-            { sku: "MMM06068", name: "3M Perfect-It Ultrafine Machine Polish 946mL", previousPrice: "74.99", salePrice: "69.99" },
-            { sku: "MMM06094", name: "3M Perfect-It Machine Polish", previousPrice: "85.99", salePrice: "69.99" },
-            { sku: "MMM33279", name: "3M Perfect-It Low Linting Wool Pad", previousPrice: "79.99", salePrice: "59.99" },
-            { sku: "MMM36060", name: "3M Perfect-It EX Rubbing Compound Qt", previousPrice: "74.99", salePrice: "59.99" },
-          ],
-          "Body Fillers & Repair": [
-            { sku: "MMM01131", name: "3M Platinum Plus Body Filler Ga", previousPrice: "71.99", salePrice: "69.99", promo: "Buy 3 Gallons Get 1 Gallon Free" },
-            { sku: "MMM04240", name: "3M Semi-Rigid Plastic Repair 200mL", previousPrice: "79.99", salePrice: "59.99" },
-            { sku: "MMM04247", name: "3M Super Fast Plastic Repair 200mL", previousPrice: "90.99", salePrice: "69.99" },
-            { sku: "MMM04248", name: "3M Super Fast Repair Adhesive 200mL", previousPrice: "100.99", salePrice: "74.99" },
-            { sku: "MMM05887", name: "3M EZ Sand Flexible Parts Repair Adhesive", previousPrice: "110.99", salePrice: "79.99" },
-            { sku: "MMM05860", name: "3M Dry Guide Coat Cartridge", previousPrice: "53.99", salePrice: "44.99", promo: "Buy 2 Cases Get 1 Free" },
-            { sku: "MMM05861", name: "3M Dry Guide Coat Applicator Kit", previousPrice: "79.99", salePrice: "64.99" },
-            { sku: "MMM20382", name: "3M Disposable Paper Mixing Board", previousPrice: "37.99", salePrice: "29.99" },
-          ],
-          "Adhesives & Seam Sealers": [
-            { sku: "MMM07333", name: "3M Impact Resistant Structural Adhesive 200mL", previousPrice: "160.99", salePrice: "99.99" },
-            { sku: "MMM08115", name: "3M Automix Panel Bonding Adhesive 200mL", previousPrice: "101.99", salePrice: "79.99" },
-            { sku: "MMM08194", name: "3M Static Mix Nozzles", previousPrice: "148.99", salePrice: "109.99" },
-            { sku: "MMM08308", name: "3M Heavy-Bodied Seam Sealer 200mL", previousPrice: "74.99", salePrice: "59.99" },
-            { sku: "MMM08323", name: "3M Factory Match Seam Sealer 200mL", previousPrice: "76.99", salePrice: "49.99" },
-            { sku: "MMM08522", name: "3M OEM Match Epoxy Seam Sealer Beige", previousPrice: "97.99", salePrice: "57.99" },
-            { sku: "MMM08524", name: "3M OEM Match Epoxy Seam Sealer White", previousPrice: "97.99", salePrice: "57.99" },
-            { sku: "MMM08526", name: "3M OEM Match Epoxy Seam Sealer Gray", previousPrice: "97.99", salePrice: "57.99" },
-            { sku: "MMM08528", name: "3M OEM Match Epoxy Seam Sealer Black", previousPrice: "97.99", salePrice: "57.99" },
-            { sku: "MMM08852", name: "3M Cavity Wax Plus 511g", previousPrice: "42.99", salePrice: "42.99", promo: "Buy 2 Cases Get 1 Free" },
-            { sku: "MMM06382", name: "3M Two Way Acrylic Plus Tape 1/2in", previousPrice: "73.99", salePrice: "49.99" },
-            { sku: "MMM06383", name: "3M Two Way Acrylic Plus Tape 7/8in", previousPrice: "107.99", salePrice: "69.99" },
-            { sku: "MMM06386", name: "3M Two Way Acrylic Plus Tape 1/4in", previousPrice: "61.99", salePrice: "29.99" },
-          ],
-          "Masking & Surface Protection": [
-            { sku: "MMM06349", name: "3M Trim & Lift Masking Tape", previousPrice: "63.99", salePrice: "39.99" },
-            { sku: "MMM06652", name: "3M Yellow Masking Tape 18mm", previousPrice: "159.99", salePrice: "119.99" },
-            { sku: "MMM06654", name: "3M Yellow Masking Tape 36mm", previousPrice: "159.99", salePrice: "119.99" },
-            { sku: "MMM06656", name: "3M Yellow Masking Tape 48mm", previousPrice: "191.99", salePrice: "129.99" },
-            { sku: "MMM06718", name: "3M Scotchblok Masking Paper", previousPrice: "74.99", salePrice: "64.99" },
-            { sku: "MMM06724", name: "3M Plastic Sheeting 16x350ft", previousPrice: "58.99", salePrice: "33.99" },
-            { sku: "MMM26334", name: "3M Scotch Green Masking Tape 3/4in", previousPrice: "244.99", salePrice: "169.99" },
-            { sku: "MMM26338", name: "3M Scotch Green Masking Tape 1 1/2in", previousPrice: "138.99", salePrice: "99.99" },
-            { sku: "MMM36852", name: "3M Dirt Trap Protection Material 28in", previousPrice: "668.99", salePrice: "499.99" },
-            { sku: "MMM05916", name: "3M Welding and Spark Deflection Paper", previousPrice: "244.99", salePrice: "149.99" },
-            { sku: "MMM05917", name: "3M Weld-Thru Coating II", previousPrice: "47.99", salePrice: "39.99" },
-            { sku: "MMM07847", name: "3M Scotch-Brite Red Durable Flex Pads", previousPrice: "37.99", salePrice: "37.99", promo: "Buy 2 Cases Get 1 Free" },
-            { sku: "MMM07848", name: "3M Scotch-Brite Grey Durable Flex Pads", previousPrice: "37.99", salePrice: "37.99", promo: "Buy 2 Cases Get 1 Free" },
-          ],
-          "Spray Guns & PPS Systems": [
-            { sku: "MMM26000", name: "3M PPS Series 2.0 Standard", previousPrice: "169.99", salePrice: "119.99" },
-            { sku: "MMM26024", name: "3M PPS Spray Cup Large", previousPrice: "175.99", salePrice: "124.99" },
-            { sku: "MMM26112", name: "3M PPS 2.0 Kit", previousPrice: "175.99", salePrice: "109.99" },
-            { sku: "MMM26114", name: "3M PPS 2.0 Mini Kit", previousPrice: "159.99", salePrice: "99.99" },
-            { sku: "MMM26163", name: "3M PPS 2.0 Vented Cups Standard", previousPrice: "201.99", salePrice: "69.99" },
-            { sku: "MMM26164", name: "3M PPS 2.0 Vented Large Cups", previousPrice: "201.99", salePrice: "89.99" },
-            { sku: "MMM26301", name: "3M PPS 2.0 Medium Lids & Liners", previousPrice: "169.99", salePrice: "119.99" },
-            { sku: "MMM26689", name: "3M High Power Spray Gun Cleaner", previousPrice: "16.99", salePrice: "16.99", promo: "Buy 2 Cases Get 1 Free" },
-            { sku: "MMM26832", name: "3M Performance Spray Gun", previousPrice: "488.99", salePrice: "399.99" },
-            { sku: "MMM26712", name: "3M HVLP Atomizing Head Refill Kit 1.2", previousPrice: "53.99", salePrice: "49.99" },
-            { sku: "MMM26713", name: "3M HVLP Atomizing Head Refill Kit 1.3", previousPrice: "53.99", salePrice: "49.99" },
-            { sku: "MMM26714", name: "3M HVLP Atomizing Head Refill Kit 1.4", previousPrice: "53.99", salePrice: "49.99" },
-          ],
-        }
-      },
-      "SEM": {
-        hasCategories: true,
-        categories: {
-          "Seam Sealers": [
-            { sku: "SEM29362", name: "SEM 1K SEAM SEALER - WHITE", previousPrice: "30.99", salePrice: "27.99" },
-            { sku: "SEM29372", name: "SEM 1K SEAM SEALER - GRAY", previousPrice: "30.99", salePrice: "27.99" },
-            { sku: "SEM29382", name: "SEM 1K SEAM SEALER - BEIGE", previousPrice: "30.99", salePrice: "27.99" },
-            { sku: "SEM29392", name: "SEM 1K SEAM SEALER - BLACK", previousPrice: "30.99", salePrice: "27.99" },
-            { sku: "SEM29462", name: "SEM 2-IN-1 SEAM SEALER - WHITE", previousPrice: "34.99", salePrice: "29.99" },
-            { sku: "SEM29472", name: "SEM 2-IN-1 SEAM SEALER - GRAY", previousPrice: "34.99", salePrice: "29.99" },
-            { sku: "SEM29482", name: "SEM 2-IN-1 SEAM SEALER - BEIGE", previousPrice: "34.99", salePrice: "29.99" },
-            { sku: "SEM29492", name: "SEM 2-IN-1 SEAM SEALER - BLACK", previousPrice: "34.99", salePrice: "29.99" },
-          ],
-          "Primers & Coatings": [
-            { sku: "SEM39143", name: "SEM TRIM BLACK", previousPrice: "24.99", salePrice: "19.99" },
-            { sku: "SEM39144-LV", name: "SEM LOW VOC TRIM BLACK", previousPrice: "87.99", salePrice: "69.99" },
-            { sku: "SEM39673", name: "SEM SELF ETCHING PRIMER - BLACK", previousPrice: "37.99", salePrice: "29.99" },
-            { sku: "SEM39683", name: "SEM SELF ETCHING PRIMER - GRAY", previousPrice: "37.99", salePrice: "29.99" },
-            { sku: "SEM39863", name: "SEM PLASTIC ADHESION PROMOTER", previousPrice: "45.99", salePrice: "39.99" },
-            { sku: "SEM40773", name: "SEM ZINCWELD", previousPrice: "39.99", salePrice: "34.99" },
-            { sku: "SEM62213", name: "SEM EZ COAT - BLACK", previousPrice: "30.99", salePrice: "24.99" },
-            { sku: "SEM62243", name: "SEM EZ COAT - GRAY", previousPrice: "30.99", salePrice: "24.99" },
-          ],
-          "Body Fillers & Glazes": [
-            { sku: "SEM40561", name: "SEM Powder Pro Ultra Lightweight Body Filler", previousPrice: "99.99", salePrice: "79.99" },
-            { sku: "SEM39592", name: "SEM METAL BITE FINISHING GLAZE", previousPrice: "66.99", salePrice: "54.99" },
-            { sku: "SEM40482", name: "SEM BUMPER BITE FLEXIBLE GLAZE", previousPrice: "55.99", salePrice: "44.99" },
-          ],
-          "Bed Liners & Protective Coatings": [
-            { sku: "SEM56650", name: "SEM GLADIATOR XC BLACK KIT", previousPrice: "243.99", salePrice: "199.99" },
-            { sku: "SEM56670", name: "SEM GLADIATOR XC TINTABLE KIT", previousPrice: "243.99", salePrice: "199.99" },
-          ],
-          "Abrasives": [
-            { sku: "SA6080", name: "SEM 6\" Grip Multihole 80, 50 Discs/Box", previousPrice: "67.99", salePrice: "59.99" },
-            { sku: "SA6120", name: "SEM 6\" Grip Multihole 120, 50 Discs/Box", previousPrice: "69.99", salePrice: "49.99" },
-            { sku: "SA6180", name: "SEM 6\" Grip Multihole 180, 50 Discs/Box", previousPrice: "69.99", salePrice: "49.99" },
-            { sku: "SA6240", name: "SEM 6\" Grip Multihole 240, 50 Discs/Box", previousPrice: "69.99", salePrice: "49.99" },
-            { sku: "SA6320", name: "SEM 6\" Grip Multihole 320, 50 Discs/Box", previousPrice: "69.99", salePrice: "49.99" },
-            { sku: "SA6400", name: "SEM 6\" Grip Multihole 400, 50 Discs/Box", previousPrice: "69.99", salePrice: "49.99" },
-          ],
-          "Aerosols & Specialty": [
-            { sku: "SEM61993", name: "SEM CUSTOM FILL AEROSOL BLANK", previousPrice: "60.00", salePrice: "24.99" },
-          ],
-        }
-      },
-      "PPG": {
-        hasCategories: true,
-        categories: {
-          "Clearcoats": [
-            { sku: "EC520", name: "EHP High Production Clearcoat Ga", previousPrice: "816.20", salePrice: "408.10" },
-            { sku: "EC530", name: "EHP Performance Clearcoat Ga", previousPrice: "816.20", salePrice: "408.10" },
-            { sku: "EC550", name: "EHP Ultra Gloss Clearcoat Ga", previousPrice: "816.20", salePrice: "408.10" },
-            { sku: "EC5515", name: "EHP Low VOC Matte Clearcoat Qt", previousPrice: "424.82", salePrice: "212.41" },
-            { sku: "EC800", name: "EHP Ultra Fast 2.1 Clearcoat Ga", previousPrice: "772.22", salePrice: "386.11" },
-            { sku: "JC7200/01", name: "Shop-Line 2.1 VOC HS European Clearcoat Ga", previousPrice: "225.48", salePrice: "112.74" },
-            { sku: "JC830", name: "Shop-Line 2.1 VOC Production Clear Ga", previousPrice: "210.58", salePrice: "105.29" },
-          ],
-          "Primers & Sealers": [
-            { sku: "ECP35", name: "EHP High Production Surfacer 2.1VOC Ga", previousPrice: "694.41", salePrice: "347.20" },
-            { sku: "ECS21", name: "EHP A-Chromatic 2.1VOC Sealer White Ga", previousPrice: "683.88", salePrice: "341.94" },
-            { sku: "ECS25", name: "EHP A-Chromatic 2.1VOC Sealer Gray Ga", previousPrice: "683.88", salePrice: "341.94" },
-            { sku: "ECS27", name: "EHP A-Chromatic 2.1VOC Sealer Black Ga", previousPrice: "683.88", salePrice: "341.94" },
-            { sku: "JP355", name: "Shop-Line 2.1 VOC Gray Primer Ga", previousPrice: "221.84", salePrice: "110.92" },
-            { sku: "JP365", name: "Shop-Line Urethane Sealer Gray Ga", previousPrice: "299.62", salePrice: "149.81" },
-            { sku: "JP390", name: "Shop-Line Epoxy Primer Gray Qt", previousPrice: "69.98", salePrice: "34.99" },
-          ],
-          "Hardeners & Reducers": [
-            { sku: "ECH5075", name: "EHP Standard Clearcoat Hardener Qt", previousPrice: "236.78", salePrice: "118.39" },
-            { sku: "JR554", name: "Shop-Line Low VOC Fast Reducer Ga", previousPrice: "121.64", salePrice: "60.82" },
-            { sku: "JR555", name: "Shop-Line Low VOC Medium Reducer Ga", previousPrice: "166.22", salePrice: "83.11" },
-          ],
-          "Specialty Products": [
-            { sku: "T4900", name: "EHP OneVisit Modifier ST 2L", previousPrice: "1509.78", salePrice: "754.89" },
-            { sku: "T4910", name: "EHP OneVisit Modifier HD 2L", previousPrice: "1509.78", salePrice: "754.89" },
-          ],
-          "Shop Supplies": [
-            { sku: "AL84-0314", name: "PPG Single Edge Razor Blades 100/pk", previousPrice: "9.49", salePrice: "4.99" },
-            { sku: "BLUEPSL", name: "PPG Blue Paint Suit Large", previousPrice: "70.20", salePrice: "49.99" },
-            { sku: "BLUEPSM", name: "PPG Blue Paint Suit Medium", previousPrice: "70.20", salePrice: "49.99" },
-            { sku: "DOX112", name: "PPG Disposable Mixing Sticks (500/bx)", previousPrice: "79.99", salePrice: "54.99" },
-            { sku: "DOX113", name: "PPG Paint Filters", previousPrice: "28.85", salePrice: "19.99" },
-            { sku: "DOX251", name: "PPG 32Oz Mixing Cups", previousPrice: "69.69", salePrice: "49.99" },
-            { sku: "DOX273", name: "PPG 85oz Mixing Cups 50/box", previousPrice: "70.28", salePrice: "49.99" },
-            { sku: "VRW100", name: "PPG Crash Wrap", previousPrice: "123.02", salePrice: "89.99" },
-            { sku: "WMP2412", name: "PPG White Masking Paper 12 x 750", previousPrice: "111.51", salePrice: "79.99" },
-            { sku: "WMP2418", name: "PPG White Masking Paper 18 x 750", previousPrice: "111.51", salePrice: "79.99" },
-          ],
-        }
-      },
-      "Norton": {
-        hasCategories: true,
-        categories: {
-          "Masking Paper": [
-            { sku: "NOR00402", name: "Masking Paper 6\" X 750 white", previousPrice: "101.99", salePrice: "69.99" },
-            { sku: "NOR00403", name: "Norton 12in Masking Paper", previousPrice: "101.99", salePrice: "69.99" },
-            { sku: "NOR00404", name: "Norton 18in Masking Paper", previousPrice: "101.99", salePrice: "69.99" },
-            { sku: "NOR00407", name: "Norton 36\" Masking Paper", previousPrice: "102.99", salePrice: "69.99" },
-          ],
-          "Adhesives & Structural Bonding": [
-            { sku: "NOR04615", name: "Norton SpeedGrip Urethane Structural Adhesive 1min", previousPrice: "90.99", salePrice: "54.99" },
-            { sku: "NOR04616", name: "Norton SpeedGrip Urethane Structural Adhesive 5min", previousPrice: "90.99", salePrice: "54.99" },
-            { sku: "NOR04647", name: "Norton SpeedGrip Urethane Structural Adhesive 45sec", previousPrice: "90.99", salePrice: "54.99" },
-          ],
-          "Seam Sealers": [
-            { sku: "NOR06398", name: "Norton Bare Metal Epoxy Seam Sealer", previousPrice: "70.99", salePrice: "54.99" },
-            { sku: "NOR06402", name: "Norton Control Flow Epoxy Seam Sealer", previousPrice: "67.99", salePrice: "49.99" },
-            { sku: "NOR06412", name: "Norton Epoxy Repair Adhesive Filler", previousPrice: "83.99", salePrice: "59.99" },
-            { sku: "NOR97120", name: "Norton Epoxy Seam Sealer", previousPrice: "69.99", salePrice: "49.99" },
-          ],
-          "Scuff Pads": [
-            { sku: "NOR06166", name: "Norton Maroon Thin Pads", previousPrice: "33.99", salePrice: "19.99" },
-            { sku: "NOR06167", name: "Norton Grey Thin Scuff Pads", previousPrice: "33.99", salePrice: "19.99" },
-            { sku: "NOR34771", name: "Norton Bear-Tex 6in Grey Scuff Disc", previousPrice: "40.99", salePrice: "27.99" },
-            { sku: "NOR34770", name: "Norton Bear-Tex 6in Maroon Scuff Disc", previousPrice: "40.99", salePrice: "27.99" },
-          ],
-          "Sanding Discs": [
-            { sku: "NOR06225", name: "Norton 6in Gold P240", previousPrice: "22.99", salePrice: "19.99" },
-            { sku: "NOR06226", name: "Norton 6in Gold P800", previousPrice: "22.99", salePrice: "19.99" },
-            { sku: "NOR06227", name: "Norton 6in Gold P600", previousPrice: "22.99", salePrice: "19.99" },
-            { sku: "NOR06230", name: "Norton 6in Gold P320", previousPrice: "22.99", salePrice: "19.99" },
-          ],
-          "Specialty Products": [
-            { sku: "NOR42082", name: "Norton LiquidIce Clean-Up Detailer Spray", previousPrice: "35.99", salePrice: "24.99" },
-          ],
-        }
-      },
-      "Equipment": {
-        hasCategories: false,
-        products: [
-          { sku: "MSX134", name: "MAXXAIR S Series AC R134", previousPrice: "10289.99", salePrice: "8574.99" },
-          { sku: "MSX3030", name: "MAXXAIR S Series AC R134A/R1234", previousPrice: "16019.99", salePrice: "13349.99" },
-          { sku: "MSX1234", name: "MAXXAIR S SERIES R1234", previousPrice: "13649.99", salePrice: "11374.99" },
-          { sku: "MSX390100", name: "MAXXAIR SpotGunJr Starter Kit", previousPrice: "236.89", salePrice: "205.99" },
-          { sku: "MSX390200", name: "MAXXAIR SpotGunJr Master Kit", previousPrice: "298.99", salePrice: "259.99" },
-          { sku: "MSX490100", name: "MAXXAIR Starter Kit", previousPrice: "201.24", salePrice: "174.99" },
-          { sku: "MSX490200", name: "MAXXAIR Master Kit", previousPrice: "246.09", salePrice: "213.99" },
-          { sku: "MSX488046PB", name: "MAXXAIR PAG 46 Oil", previousPrice: "21.72", salePrice: "18.89" },
-          { sku: "MSX488046PBD", name: "MAXXAIR PAG 46 Oil with AC ExtenDye", previousPrice: "15.32", salePrice: "13.32" },
-          { sku: "MSXFXP2", name: "MAXXAIR FX Series Kits", previousPrice: "1228.23", salePrice: "1068.03" },
-          { sku: "RBNLD3", name: "RobinAir LD3 Refrigerant Leak Detector Economy", previousPrice: "536.73", salePrice: "479.22" },
-          { sku: "RBNLD5", name: "RobinAir LD5 Refrigerant Leak Detector Select", previousPrice: "742.29", salePrice: "662.76" },
-          { sku: "RBNLD7", name: "RobinAir LD7 Refrigerant Leak Detector Premium", previousPrice: "799.41", salePrice: "713.76" },
-          { sku: "RBN34288NI", name: "RobinAir Basic 134a Refrigerant", previousPrice: "7674.84", salePrice: "6852.54" },
-          { sku: "RBN34788NI", name: "RobinAir Multi-Vehicle 134a Refrigerant", previousPrice: "9273.75", salePrice: "8280.13" },
-          { sku: "RBNAC1234-4", name: "RobinAir Basic 1234yf Refrigerant", previousPrice: "12365.07", salePrice: "11040.24" },
-          { sku: "BSHDAS3000-3", name: "Bosch DAS3000-3 ADAS System", previousPrice: "57622.72", salePrice: "42683.50" },
-          { sku: "STG030420", name: "StrongArm 3-1/2 Ton Service Jack w 4-Ton Stand", previousPrice: "712.80", salePrice: "636.43" },
-        ]
-      },
-      "Henkel": {
-        hasCategories: false,
-        products: [
-          { sku: "HEN1305486", name: "Henkel Teroson Flatstream Nozzles", previousPrice: "20.99", salePrice: "14.99" },
-          { sku: "HEN1470999", name: "Henkel Teroson Widestream Nozzle 10pk", previousPrice: "20.99", salePrice: "14.99" },
-          { sku: "HEN2264448", name: "Henkel Loctite 4070 Universal Adhesive Kit", previousPrice: "34.99", salePrice: "24.99" },
-          { sku: "HEN2399541", name: "Henkel Teroson Door Edge Nozzle", previousPrice: "20.99", salePrice: "14.99" },
-          { sku: "HEN2399908", name: "Henkel Teroson T2 Flat Nozzles", previousPrice: "20.99", salePrice: "14.99" },
-          { sku: "HEN2469715", name: "Henkel Teroson WT S3000 Stonechip Protection", previousPrice: "63.99", salePrice: "39.99" },
-          { sku: "HEN2568797", name: "Henkel Teroson MS 222 Anti-Flutter Material", previousPrice: "44.99", salePrice: "29.99" },
-          { sku: "HEN2568817", name: "Henkel Teroson MS 9120 SF - White", previousPrice: "37.99", salePrice: "24.99" },
-          { sku: "HEN2568818", name: "Henkel Teroson MS 9320 SF - Grey", previousPrice: "37.99", salePrice: "24.99" },
-          { sku: "HEN2816502", name: "Henkel Teroson EP 5055 SB Panel Bond Adhesive", previousPrice: "91.99", salePrice: "49.99" },
-          { sku: "HEN2820041", name: "Henkel Teroson MS 9320 SF - Black", previousPrice: "37.99", salePrice: "24.99" },
-          { sku: "HEN1434516", name: "Henkel Loctite Replacement Nozzles", previousPrice: "7.99", salePrice: "5.99" },
-          { sku: "HEN1585815", name: "Henkel Teroson ET UBC Gun", previousPrice: "60.99", salePrice: "54.99" },
-        ]
-      },
-      "Q1": {
-        hasCategories: false,
-        products: [
-          { sku: "CPM118", name: "Q1 Car Plus Masking Tape 18mm (3/4\")", previousPrice: "75.00", salePrice: "65.00" },
-          { sku: "CPM136.55", name: "Q1 Car Plus Masking Tape 36mm (1 1/2\")", previousPrice: "75.00", salePrice: "65.00" },
-        ]
-      },
-      "Rexall": {
-        hasCategories: false,
-        products: [
-          { sku: "CHC590248-5", name: "Premium Solvent Cleaner", previousPrice: "75.00", salePrice: "49.99" },
-          { sku: "CHC590266-5", name: "Professional Solvent Cleaner", previousPrice: "59.99", salePrice: "39.99" },
-          { sku: "CHC590269-5", name: "Wax and Grease Remover 5Ga", previousPrice: "135.99", salePrice: "79.99" },
-          { sku: "CHC590353-5", name: "Final Wash 5Ga", previousPrice: "99.99", salePrice: "79.99" },
-          { sku: "MTN0002", name: "Montana Stone Shield 400ml", previousPrice: "13.49", salePrice: "9.99" },
-          { sku: "MTN0901", name: "Montana Matte Black 400ml", previousPrice: "12.49", salePrice: "7.99" },
-          { sku: "MTN0903", name: "Montana Satin Black 400ml", previousPrice: "12.49", salePrice: "7.99" },
-          { sku: "MTN0908", name: "Montana Gloss Acrylic 400ml", previousPrice: "15.49", salePrice: "11.99" },
-          { sku: "MTN9010", name: "Montana Gloss White 400ml", previousPrice: "12.49", salePrice: "7.99" },
-          { sku: "MTN9011", name: "Montana Gloss Black 400ml", previousPrice: "12.49", salePrice: "7.99" },
-        ]
-      },
-      "Tork": {
-        hasCategories: false,
-        products: [
-          { sku: "SCA121202", name: "8.25'x 600' M-Torq 6/pkg", previousPrice: "65.00", salePrice: "49.99" },
-          { sku: "SCA192480", name: "Specialist Cloth Top Pack", previousPrice: "159.99", salePrice: "119.99" },
-        ]
-      },
-      "Wipeco": {
-        hasCategories: false,
-        products: [
-          { sku: "DN106-L", name: "WIPECO 6 Mil Nitrile Gloves L 100/BX", previousPrice: "15.00", salePrice: "8.99" },
-          { sku: "DN106-M", name: "WIPECO 6 Mil Nitrile Gloves M 100/Bx", previousPrice: "15.00", salePrice: "8.99" },
-          { sku: "DN106-XL", name: "WIPECO 6 Mil Nitrile Gloves XL 100/Bx", previousPrice: "15.00", salePrice: "8.99" },
-          { sku: "DN850BKEC-L", name: "WIPECO 8 Mil Nitrile Gloves L 50/Bx", previousPrice: "15.00", salePrice: "6.99" },
-          { sku: "DN850BKEC-M", name: "WIPECO 8 Mil Nitrile Gloves M 50/Bx", previousPrice: "15.00", salePrice: "6.99" },
-          { sku: "DN850BKEC-XL", name: "WIPECO 8 Mil Nitrile Gloves XL 50/Bx", previousPrice: "15.00", salePrice: "6.99" },
-        ]
-      },
-    };
-
-    const BRANDS = ["3M", "SEM", "PPG", "Norton", "Equipment", "Henkel", "Q1", "Rexall", "Tork", "Wipeco"];
     const BRANCHES = ["Woodbridge", "Markham", "Ottawa", "Hamilton", "Oakville", "St. Catharines"];
-    const PRODUCT_COUNTS = { "3M": 184, "Equipment": 18, "Henkel": 13, "Norton": 20, "PPG": 29, "Q1": 2, "Rexall": 10, "SEM": 28, "Tork": 2, "Wipeco": 6 };
+
+    // ========================================
+    // DYNAMIC DATA (loaded from API)
+    // ========================================
+    let PRODUCTS = {};
+    let BRANDS = [];
+    let PRODUCT_COUNTS = {};
+    let TOTAL_PRODUCTS = 0;
 
     // ========================================
     // APPLICATION STATE
     // ========================================
     let state = {
-      activeBrand: "3M",
+      // Sale selection
+      screen: 'loading', // loading | sale-picker | login | catalog | order-success
+      activeSales: [],
+      selectedSale: null,
+      isLoadingSales: true,
+      isLoadingProducts: false,
+
+      // Auth
+      isAuthenticated: false,
+      isAuthenticating: false,
+      passwordError: false,
+      authErrorMessage: "",
+
+      // Catalog
+      activeBrand: null,
       activeCategory: null,
       searchQuery: "",
+
+      // Cart & Checkout
       cart: [],
       isCartOpen: false,
       isCheckoutOpen: false,
       orderSubmitted: false,
       isSubmitting: false,
-      isAuthenticating: false,
       shopName: "",
       contactEmail: "",
       branch: "",
       toast: null,
-      passwordError: false,
-      authErrorMessage: "",
       lastOrderId: null
     };
+
+    // ========================================
+    // INIT — Load active sales
+    // ========================================
+    async function initApp() {
+      // Check if already authenticated for a sale
+      const savedSaleId = sessionStorage.getItem('chc_sale_id');
+      const savedAuth = sessionStorage.getItem('chc_authenticated');
+
+      try {
+        const res = await fetch('/api/sales');
+        const sales = await res.json();
+
+        if (Array.isArray(sales) && sales.length > 0) {
+          state.activeSales = sales;
+
+          // If only one active sale, skip the picker
+          if (sales.length === 1) {
+            state.selectedSale = sales[0];
+
+            if (savedAuth === 'true' && savedSaleId === sales[0].id) {
+              // Already authenticated
+              state.isAuthenticated = true;
+              state.screen = 'catalog';
+              await loadProductsForSale(sales[0].id);
+            } else {
+              state.screen = 'login';
+            }
+          } else if (savedAuth === 'true' && savedSaleId) {
+            // Returning user — find their sale
+            const sale = sales.find(s => s.id === savedSaleId);
+            if (sale) {
+              state.selectedSale = sale;
+              state.isAuthenticated = true;
+              state.screen = 'catalog';
+              await loadProductsForSale(sale.id);
+            } else {
+              state.screen = 'sale-picker';
+            }
+          } else {
+            state.screen = 'sale-picker';
+          }
+        } else {
+          // No active sales — show a message or try legacy mode
+          state.activeSales = [];
+          state.screen = 'login'; // Legacy: single password
+        }
+      } catch (e) {
+        console.error('Failed to load sales:', e);
+        // Fallback: show login for legacy mode
+        state.screen = 'login';
+      }
+
+      state.isLoadingSales = false;
+      render();
+    }
+
+    async function loadProductsForSale(saleId) {
+      state.isLoadingProducts = true;
+      render();
+
+      try {
+        const res = await fetch(`/api/sales/${saleId}/products`);
+        const data = await res.json();
+
+        PRODUCTS = data.products || {};
+        BRANDS = data.brands || Object.keys(PRODUCTS);
+        PRODUCT_COUNTS = data.productCounts || {};
+        TOTAL_PRODUCTS = data.total || 0;
+
+        state.activeBrand = BRANDS.length > 0 ? BRANDS[0] : null;
+      } catch (e) {
+        console.error('Failed to load products:', e);
+        PRODUCTS = {};
+        BRANDS = [];
+        PRODUCT_COUNTS = {};
+        TOTAL_PRODUCTS = 0;
+      }
+
+      state.isLoadingProducts = false;
+    }
+
+    // ========================================
+    // SALE SELECTION
+    // ========================================
+    function selectSale(saleId) {
+      const sale = state.activeSales.find(s => s.id === saleId);
+      if (sale) {
+        state.selectedSale = sale;
+        state.screen = 'login';
+        state.passwordError = false;
+        state.authErrorMessage = '';
+        render();
+      }
+    }
+
+    function backToSalePicker() {
+      state.selectedSale = null;
+      state.isAuthenticated = false;
+      state.screen = 'sale-picker';
+      sessionStorage.removeItem('chc_authenticated');
+      sessionStorage.removeItem('chc_sale_id');
+      render();
+    }
+
+    // ========================================
+    // PASSWORD CHECK (server-side)
+    // ========================================
+    async function checkPassword() {
+      const input = document.getElementById('passwordInput');
+      const password = input ? input.value : '';
+
+      if (!password) {
+        state.passwordError = true;
+        state.authErrorMessage = 'Please enter a password.';
+        render();
+        return;
+      }
+
+      state.isAuthenticating = true;
+      state.passwordError = false;
+      state.authErrorMessage = '';
+      render();
+
+      try {
+        const body = { password };
+        if (state.selectedSale) {
+          body.sale_id = state.selectedSale.id;
+        }
+
+        const response = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          state.isAuthenticated = true;
+          state.passwordError = false;
+          state.isAuthenticating = false;
+
+          sessionStorage.setItem('chc_authenticated', 'true');
+          if (state.selectedSale) {
+            sessionStorage.setItem('chc_sale_id', state.selectedSale.id);
+          }
+
+          // Load products
+          if (state.selectedSale) {
+            state.screen = 'catalog';
+            render();
+            await loadProductsForSale(state.selectedSale.id);
+            render();
+          } else {
+            state.screen = 'catalog';
+            render();
+          }
+        } else {
+          state.passwordError = true;
+          state.isAuthenticating = false;
+          state.authErrorMessage = result.error || 'Incorrect password. Please try again.';
+          render();
+          setTimeout(() => {
+            const form = document.getElementById('loginForm');
+            if (form) form.classList.add('shake');
+          }, 10);
+        }
+      } catch (error) {
+        console.error('Auth error:', error);
+        state.passwordError = true;
+        state.isAuthenticating = false;
+        state.authErrorMessage = 'Connection error. Please try again.';
+        render();
+      }
+    }
+
+    function handlePasswordKeypress(e) {
+      if (e.key === 'Enter') checkPassword();
+    }
 
     // ========================================
     // UTILITY FUNCTIONS
@@ -406,13 +293,13 @@
     function getFilteredProducts() {
       const brandData = PRODUCTS[state.activeBrand];
       if (!brandData) return { hasCategories: false, products: [] };
-      
+
       const q = state.searchQuery.toLowerCase();
-      
+
       if (brandData.hasCategories) {
         const filteredCategories = {};
         Object.entries(brandData.categories).forEach(([category, products]) => {
-          const filtered = q 
+          const filtered = q
             ? products.filter(p => p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q))
             : products;
           if (filtered.length > 0) {
@@ -422,7 +309,7 @@
         return { hasCategories: true, categories: filteredCategories };
       } else {
         const products = brandData.products || [];
-        const filtered = q 
+        const filtered = q
           ? products.filter(p => p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q))
           : products;
         return { hasCategories: false, products: filtered };
@@ -437,99 +324,6 @@
         return count;
       }
       return data.products.length;
-    }
-
-    function generateOrderId() {
-      return 'ORD-' + Date.now().toString(36).toUpperCase();
-    }
-
-    function formatOrderItems() {
-      return state.cart.map(item => 
-        `${item.sku} - ${item.name} x${item.quantity} @ $${formatPrice(item.salePrice)} = $${formatPrice(parseFloat(item.salePrice) * item.quantity)}`
-      ).join('\n');
-    }
-
-    // ========================================
-    // ORDER SUBMISSION (server handles email + database)
-    // ========================================
-    async function submitOrderToBackend() {
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shopName: state.shopName,
-          email: state.contactEmail,
-          branch: state.branch,
-          items: state.cart,
-          total: getCartTotal()
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit order');
-      }
-
-      return await response.json();
-    }
-
-    // ========================================
-    // PASSWORD CHECK (server-side verification)
-    // ========================================
-    async function checkPassword() {
-      const input = document.getElementById('passwordInput');
-      const password = input ? input.value : '';
-
-      if (!password) {
-        state.passwordError = true;
-        state.authErrorMessage = 'Please enter a password.';
-        render();
-        return;
-      }
-
-      state.isAuthenticating = true;
-      state.passwordError = false;
-      state.authErrorMessage = '';
-      render();
-
-      try {
-        const response = await fetch('/api/auth/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password })
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          isAuthenticated = true;
-          sessionStorage.setItem('chc_authenticated', 'true');
-          state.passwordError = false;
-          state.isAuthenticating = false;
-          render();
-        } else {
-          state.passwordError = true;
-          state.isAuthenticating = false;
-          state.authErrorMessage = result.error || 'Incorrect password. Please try again.';
-          render();
-          setTimeout(() => {
-            const form = document.getElementById('loginForm');
-            if (form) form.classList.add('shake');
-          }, 10);
-        }
-      } catch (error) {
-        console.error('Auth error:', error);
-        state.passwordError = true;
-        state.isAuthenticating = false;
-        state.authErrorMessage = 'Connection error. Please try again.';
-        render();
-      }
-    }
-
-    function handlePasswordKeypress(e) {
-      if (e.key === 'Enter') {
-        checkPassword();
-      }
     }
 
     // ========================================
@@ -574,26 +368,19 @@
       render();
     }
 
-    function openCart() {
-      state.isCartOpen = true;
-      render();
+    function openCart() { state.isCartOpen = true; render(); }
+    function closeCart() { state.isCartOpen = false; render(); }
+    function openCheckout() { state.isCheckoutOpen = true; render(); }
+    function closeCheckout() { state.isCheckoutOpen = false; render(); }
+
+    function scrollToCategory(categoryId) {
+      const element = document.getElementById(categoryId);
+      if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function closeCart() {
-      state.isCartOpen = false;
-      render();
-    }
-
-    function openCheckout() {
-      state.isCheckoutOpen = true;
-      render();
-    }
-
-    function closeCheckout() {
-      state.isCheckoutOpen = false;
-      render();
-    }
-
+    // ========================================
+    // ORDER SUBMISSION
+    // ========================================
     async function submitOrder() {
       if (!state.shopName || !state.contactEmail || !state.branch) {
         showToast("Please fill in all fields");
@@ -604,12 +391,35 @@
       render();
 
       try {
-        const result = await submitOrderToBackend();
+        const body = {
+          shopName: state.shopName,
+          email: state.contactEmail,
+          branch: state.branch,
+          items: state.cart,
+          total: getCartTotal()
+        };
+
+        if (state.selectedSale) {
+          body.sale_id = state.selectedSale.id;
+        }
+
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to submit order');
+        }
+
+        const result = await response.json();
         state.lastOrderId = result.orderId;
         state.isSubmitting = false;
-        state.orderSubmitted = true;
-        state.isCheckoutOpen = false;
+        state.screen = 'order-success';
         state.isCartOpen = false;
+        state.isCheckoutOpen = false;
         render();
       } catch (error) {
         state.isSubmitting = false;
@@ -619,7 +429,7 @@
     }
 
     function resetOrder() {
-      state.orderSubmitted = false;
+      state.screen = 'catalog';
       state.cart = [];
       state.shopName = "";
       state.contactEmail = "";
@@ -631,51 +441,125 @@
     function showToast(message) {
       state.toast = message;
       render();
-      setTimeout(() => {
-        state.toast = null;
-        render();
-      }, 2500);
+      setTimeout(() => { state.toast = null; render(); }, 2500);
     }
 
-    function scrollToCategory(categoryId) {
-      const element = document.getElementById(categoryId);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+    function handleSubmitOrder() {
+      state.shopName = document.getElementById('shopNameInput')?.value || '';
+      state.contactEmail = document.getElementById('emailInput')?.value || '';
+      state.branch = document.getElementById('branchSelect')?.value || '';
+      submitOrder();
     }
 
     // ========================================
-    // RENDER FUNCTIONS
+    // RENDER
     // ========================================
     function render() {
       const app = document.getElementById('app');
-      
-      if (!isAuthenticated) {
-        app.innerHTML = renderLoginPage();
-        setTimeout(() => {
-          const input = document.getElementById('passwordInput');
-          if (input) input.focus();
-        }, 100);
-        return;
+
+      switch (state.screen) {
+        case 'loading':
+          app.innerHTML = renderLoadingScreen();
+          break;
+        case 'sale-picker':
+          app.innerHTML = renderSalePicker();
+          break;
+        case 'login':
+          app.innerHTML = renderLoginPage();
+          setTimeout(() => {
+            const input = document.getElementById('passwordInput');
+            if (input) input.focus();
+          }, 100);
+          break;
+        case 'catalog':
+          if (state.isLoadingProducts) {
+            app.innerHTML = renderLoadingScreen();
+          } else {
+            app.innerHTML = `
+              ${renderHeader()}
+              ${renderMain()}
+              ${state.isCartOpen ? renderCartSidebar() : ''}
+              ${state.isCheckoutOpen ? renderCheckoutModal() : ''}
+              ${state.toast ? renderToast() : ''}
+            `;
+            attachEventListeners();
+          }
+          break;
+        case 'order-success':
+          app.innerHTML = renderOrderSuccess();
+          break;
+        default:
+          app.innerHTML = renderLoadingScreen();
       }
-      
-      if (state.orderSubmitted) {
-        app.innerHTML = renderOrderSuccess();
-        return;
-      }
-      
-      app.innerHTML = `
-        ${renderHeader()}
-        ${renderMain()}
-        ${state.isCartOpen ? renderCartSidebar() : ''}
-        ${state.isCheckoutOpen ? renderCheckoutModal() : ''}
-        ${state.toast ? renderToast() : ''}
-      `;
-      
-      attachEventListeners();
     }
 
+    function renderLoadingScreen() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+          <div class="text-center">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-orange-500 rounded-2xl shadow-lg mb-6">
+              <i class="fas fa-box text-white text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white mb-4">CHC Paint</h1>
+            <div class="flex items-center gap-2 text-slate-400">
+              <i class="fas fa-spinner animate-spin"></i>
+              <span>Loading…</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ========================================
+    // SALE PICKER
+    // ========================================
+    function renderSalePicker() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+          <div class="w-full max-w-lg">
+            <div class="text-center mb-8">
+              <div class="inline-flex items-center justify-center w-20 h-20 bg-orange-500 rounded-2xl shadow-lg mb-6">
+                <i class="fas fa-box text-white text-3xl"></i>
+              </div>
+              <h1 class="text-3xl font-bold text-white mb-2">CHC Paint</h1>
+              <p class="text-slate-400">Select a sale to browse</p>
+            </div>
+
+            <div class="space-y-3">
+              ${state.activeSales.map(sale => `
+                <button onclick="selectSale('${sale.id}')"
+                  class="w-full bg-white/10 hover:bg-white/15 backdrop-blur border border-white/10 rounded-xl p-5 text-left transition-all group">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h3 class="text-lg font-bold text-white group-hover:text-orange-400 transition-colors">${escHtml(sale.name)}</h3>
+                      ${sale.description ? `<p class="text-slate-400 text-sm mt-1">${escHtml(sale.description)}</p>` : ''}
+                      ${sale.end_date ? `<p class="text-slate-500 text-xs mt-2"><i class="fas fa-calendar mr-1"></i>Ends ${new Date(sale.end_date).toLocaleDateString()}</p>` : ''}
+                    </div>
+                    <i class="fas fa-arrow-right text-slate-500 group-hover:text-orange-400 transition-colors"></i>
+                  </div>
+                </button>
+              `).join('')}
+            </div>
+
+            ${state.activeSales.length === 0 ? `
+              <div class="text-center py-12">
+                <i class="fas fa-store-slash text-4xl text-slate-600 mb-4"></i>
+                <h3 class="text-white text-lg font-semibold mb-2">No Active Sales</h3>
+                <p class="text-slate-400">There are no sales running right now. Check back later!</p>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    // ========================================
+    // LOGIN PAGE
+    // ========================================
     function renderLoginPage() {
+      const saleName = state.selectedSale ? state.selectedSale.name : 'Warehouse Sale';
+      const showBack = state.activeSales.length > 1;
+
       return `
         <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
           <div class="w-full max-w-md">
@@ -684,9 +568,9 @@
                 <i class="fas fa-box text-white text-3xl"></i>
               </div>
               <h1 class="text-3xl font-bold text-white mb-2">CHC Paint</h1>
-              <p class="text-slate-400">Warehouse Sale 2026</p>
+              <p class="text-slate-400">${escHtml(saleName)}</p>
             </div>
-            
+
             <div id="loginForm" class="bg-white rounded-2xl shadow-2xl p-8 ${state.passwordError ? 'shake' : ''}">
               <div class="text-center mb-6">
                 <div class="inline-flex items-center justify-center w-12 h-12 bg-slate-100 rounded-full mb-4">
@@ -695,14 +579,14 @@
                 <h2 class="text-xl font-bold text-slate-900">Customer Access</h2>
                 <p class="text-slate-500 text-sm mt-1">Enter your password to view the catalog</p>
               </div>
-              
+
               <div class="space-y-4">
                 <div>
                   <label class="block text-sm font-medium text-slate-700 mb-2">Password</label>
                   <div class="relative">
-                    <input 
-                      type="password" 
-                      id="passwordInput" 
+                    <input
+                      type="password"
+                      id="passwordInput"
                       placeholder="Enter customer password"
                       onkeypress="handlePasswordKeypress(event)"
                       class="w-full px-4 py-3 border ${state.passwordError ? 'border-red-300 bg-red-50' : 'border-slate-200'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-colors"
@@ -716,7 +600,7 @@
                     </p>
                   ` : ''}
                 </div>
-                
+
                 <button
                   onclick="checkPassword()"
                   class="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
@@ -730,36 +614,31 @@
                     <i class="fas fa-arrow-right"></i>
                   `}
                 </button>
+
+                ${showBack ? `
+                  <button onclick="backToSalePicker()" class="w-full py-2 text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors">
+                    <i class="fas fa-arrow-left mr-1"></i> Choose a different sale
+                  </button>
+                ` : ''}
               </div>
             </div>
-            
+
             <div class="text-center mt-6">
               <p class="text-slate-500 text-sm">
                 <i class="fas fa-info-circle mr-1"></i>
                 Contact your CHC sales rep if you need access
               </p>
             </div>
-            
-            <div class="flex justify-center gap-4 mt-8">
-              <div class="flex items-center gap-2 text-slate-400 text-sm">
-                <i class="fas fa-tags text-orange-500"></i>
-                <span>312 Products</span>
-              </div>
-              <div class="flex items-center gap-2 text-slate-400 text-sm">
-                <i class="fas fa-percent text-orange-500"></i>
-                <span>Up to 50% Off</span>
-              </div>
-              <div class="flex items-center gap-2 text-slate-400 text-sm">
-                <i class="fas fa-store text-orange-500"></i>
-                <span>6 Locations</span>
-              </div>
-            </div>
           </div>
         </div>
       `;
     }
 
+    // ========================================
+    // CATALOG HEADER
+    // ========================================
     function renderHeader() {
+      const saleName = state.selectedSale ? state.selectedSale.name : 'Warehouse Sale';
       return `
         <header class="bg-slate-900 text-white sticky top-0 z-40">
           <div class="max-w-7xl mx-auto px-4 py-4">
@@ -770,18 +649,25 @@
                 </div>
                 <div>
                   <h1 class="text-xl font-bold">CHC Paint</h1>
-                  <p class="text-xs text-slate-400">Warehouse Sale 2026 • 312 Products</p>
+                  <p class="text-xs text-slate-400">${escHtml(saleName)} &bull; ${TOTAL_PRODUCTS} Products</p>
                 </div>
               </div>
-              <button onclick="openCart()" class="relative bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
-                <i class="fas fa-shopping-cart"></i>
-                <span class="font-medium hidden sm:inline">Cart</span>
-                ${getCartCount() > 0 ? `<span class="absolute -top-2 -right-2 bg-white text-orange-500 text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">${getCartCount()}</span>` : ''}
-              </button>
+              <div class="flex items-center gap-2">
+                ${state.activeSales.length > 1 ? `
+                  <button onclick="backToSalePicker()" class="text-slate-400 hover:text-white px-3 py-2 rounded-lg text-sm transition-colors" title="Switch sale">
+                    <i class="fas fa-exchange-alt"></i>
+                  </button>
+                ` : ''}
+                <button onclick="openCart()" class="relative bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+                  <i class="fas fa-shopping-cart"></i>
+                  <span class="font-medium hidden sm:inline">Cart</span>
+                  ${getCartCount() > 0 ? `<span class="absolute -top-2 -right-2 bg-white text-orange-500 text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">${getCartCount()}</span>` : ''}
+                </button>
+              </div>
             </div>
             <div class="mt-4 relative">
               <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-              <input type="text" id="searchInput" placeholder="Search by SKU or description..." value="${state.searchQuery}" 
+              <input type="text" id="searchInput" placeholder="Search by SKU or description..." value="${state.searchQuery}"
                 class="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none">
             </div>
           </div>
@@ -789,9 +675,9 @@
             <div class="max-w-7xl mx-auto px-4">
               <div class="flex gap-1 py-2">
                 ${BRANDS.map(brand => `
-                  <button onclick="setBrand('${brand}')" class="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1 ${state.activeBrand === brand ? 'bg-orange-500 text-white' : 'text-slate-300 hover:bg-slate-800'}">
-                    ${brand}
-                    <span class="text-xs px-1.5 py-0.5 rounded ${state.activeBrand === brand ? 'bg-orange-600' : 'bg-slate-700'}">${PRODUCT_COUNTS[brand]}</span>
+                  <button onclick="setBrand('${escHtml(brand)}')" class="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1 ${state.activeBrand === brand ? 'bg-orange-500 text-white' : 'text-slate-300 hover:bg-slate-800'}">
+                    ${escHtml(brand)}
+                    <span class="text-xs px-1.5 py-0.5 rounded ${state.activeBrand === brand ? 'bg-orange-600' : 'bg-slate-700'}">${PRODUCT_COUNTS[brand] || 0}</span>
                   </button>
                 `).join('')}
               </div>
@@ -801,20 +687,32 @@
       `;
     }
 
+    // ========================================
+    // MAIN CONTENT
+    // ========================================
     function renderMain() {
+      if (BRANDS.length === 0) {
+        return `
+          <main class="max-w-7xl mx-auto px-4 py-12 text-center">
+            <i class="fas fa-box-open text-6xl text-slate-300 mb-4"></i>
+            <h2 class="text-2xl font-bold text-slate-700 mb-2">No Products Available</h2>
+            <p class="text-slate-500">Products haven't been added to this sale yet. Check back soon!</p>
+          </main>
+        `;
+      }
+
       const data = getFilteredProducts();
       const totalCount = getTotalFilteredCount();
-      
+
       return `
         <main class="max-w-7xl mx-auto px-4 py-6">
           <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 class="text-2xl font-bold text-slate-900">${state.activeBrand}</h2>
+              <h2 class="text-2xl font-bold text-slate-900">${escHtml(state.activeBrand || '')}</h2>
               <p class="text-slate-500">Showing ${totalCount} products</p>
             </div>
             ${data.hasCategories ? renderCategoryNav(data.categories) : ''}
           </div>
-          
           ${data.hasCategories ? renderCategorizedProducts(data.categories) : renderFlatProducts(data.products)}
         </main>
       `;
@@ -825,9 +723,9 @@
       return `
         <div class="flex flex-wrap gap-2">
           ${categoryNames.map(cat => `
-            <button onclick="scrollToCategory('cat-${cat.replace(/[^a-zA-Z0-9]/g, '-')}')" 
+            <button onclick="scrollToCategory('cat-${cat.replace(/[^a-zA-Z0-9]/g, '-')}')"
               class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-full transition-colors">
-              ${cat}
+              ${escHtml(cat)}
             </button>
           `).join('')}
         </div>
@@ -839,7 +737,7 @@
         <div id="cat-${category.replace(/[^a-zA-Z0-9]/g, '-')}" class="mb-8">
           <div class="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-4 py-3 rounded-t-xl flex items-center gap-3">
             <i class="fas fa-folder-open text-orange-400"></i>
-            <h3 class="font-bold text-lg">${category}</h3>
+            <h3 class="font-bold text-lg">${escHtml(category)}</h3>
             <span class="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">${products.length} items</span>
           </div>
           <div class="bg-white rounded-b-xl shadow-sm overflow-hidden">
@@ -891,15 +789,15 @@
       const inCart = state.cart.find(item => item.sku === product.sku);
       const discount = getDiscount(product.previousPrice, product.salePrice);
       const hasPromo = product.promo ? true : false;
-      
+
       return `
         <tr class="hover:bg-slate-50 transition-colors ${hasPromo ? 'bg-green-50' : ''}">
           <td class="px-4 py-4">
-            <span class="font-mono font-semibold text-blue-600">${product.sku}</span>
+            <span class="font-mono font-semibold text-blue-600">${escHtml(product.sku)}</span>
           </td>
           <td class="px-4 py-4">
-            <p class="font-medium text-slate-900">${product.name}</p>
-            ${hasPromo ? `<p class="text-xs mt-1 text-green-700 font-semibold"><i class="fas fa-gift mr-1"></i>${product.promo}</p>` : ''}
+            <p class="font-medium text-slate-900">${escHtml(product.name)}</p>
+            ${hasPromo ? `<p class="text-xs mt-1 text-green-700 font-semibold"><i class="fas fa-gift mr-1"></i>${escHtml(product.promo)}</p>` : ''}
           </td>
           <td class="px-4 py-4">
             <span class="text-slate-400 line-through">$${formatPrice(product.previousPrice)}</span>
@@ -913,11 +811,11 @@
           <td class="px-4 py-4 text-right">
             ${inCart ? `
               <div class="inline-flex items-center gap-2 bg-slate-100 rounded-lg px-2 py-1">
-                <button onclick="updateQuantity('${product.sku}', -1)" class="p-1 hover:bg-slate-200 rounded">
+                <button onclick="updateQuantity('${escHtml(product.sku)}', -1)" class="p-1 hover:bg-slate-200 rounded">
                   <i class="fas fa-minus text-sm"></i>
                 </button>
                 <span class="font-semibold w-8 text-center">${inCart.quantity}</span>
-                <button onclick="updateQuantity('${product.sku}', 1)" class="p-1 hover:bg-slate-200 rounded">
+                <button onclick="updateQuantity('${escHtml(product.sku)}', 1)" class="p-1 hover:bg-slate-200 rounded">
                   <i class="fas fa-plus text-sm"></i>
                 </button>
               </div>
@@ -931,6 +829,9 @@
       `;
     }
 
+    // ========================================
+    // CART SIDEBAR
+    // ========================================
     function renderCartSidebar() {
       return `
         <div class="fixed inset-0 z-50">
@@ -958,20 +859,20 @@
                     <div class="bg-slate-50 rounded-lg p-3">
                       <div class="flex justify-between items-start mb-2">
                         <div class="flex-1 min-w-0">
-                          <p class="font-mono text-sm text-blue-600">${item.sku}</p>
-                          <p class="font-medium text-sm truncate">${item.name}</p>
+                          <p class="font-mono text-sm text-blue-600">${escHtml(item.sku)}</p>
+                          <p class="font-medium text-sm truncate">${escHtml(item.name)}</p>
                         </div>
-                        <button onclick="removeFromCart('${item.sku}')" class="p-1 text-red-500 hover:bg-red-50 rounded ml-2">
+                        <button onclick="removeFromCart('${escHtml(item.sku)}')" class="p-1 text-red-500 hover:bg-red-50 rounded ml-2">
                           <i class="fas fa-trash text-sm"></i>
                         </button>
                       </div>
                       <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2 bg-white rounded-lg px-2 py-1 border">
-                          <button onclick="updateQuantity('${item.sku}', -1)" class="p-1 hover:bg-slate-100 rounded">
+                          <button onclick="updateQuantity('${escHtml(item.sku)}', -1)" class="p-1 hover:bg-slate-100 rounded">
                             <i class="fas fa-minus text-xs"></i>
                           </button>
                           <span class="font-semibold w-6 text-center text-sm">${item.quantity}</span>
-                          <button onclick="updateQuantity('${item.sku}', 1)" class="p-1 hover:bg-slate-100 rounded">
+                          <button onclick="updateQuantity('${escHtml(item.sku)}', 1)" class="p-1 hover:bg-slate-100 rounded">
                             <i class="fas fa-plus text-xs"></i>
                           </button>
                         </div>
@@ -998,6 +899,9 @@
       `;
     }
 
+    // ========================================
+    // CHECKOUT MODAL
+    // ========================================
     function renderCheckoutModal() {
       return `
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1010,12 +914,12 @@
             <div class="p-6 space-y-4">
               <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Shop Name *</label>
-                <input type="text" id="shopNameInput" value="${state.shopName}" placeholder="Your auto body shop name"
+                <input type="text" id="shopNameInput" value="${escHtml(state.shopName)}" placeholder="Your auto body shop name"
                   class="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none">
               </div>
               <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Contact Email *</label>
-                <input type="email" id="emailInput" value="${state.contactEmail}" placeholder="your@email.com"
+                <input type="email" id="emailInput" value="${escHtml(state.contactEmail)}" placeholder="your@email.com"
                   class="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none">
               </div>
               <div>
@@ -1058,6 +962,9 @@
       `;
     }
 
+    // ========================================
+    // ORDER SUCCESS
+    // ========================================
     function renderOrderSuccess() {
       const branchEmail = BRANCH_EMAILS[state.branch];
       return `
@@ -1067,20 +974,22 @@
               <i class="fas fa-check text-4xl text-green-600"></i>
             </div>
             <h1 class="text-2xl font-bold text-gray-900 mb-2">Order Submitted!</h1>
-            <p class="text-gray-600 mb-6">Thank you for your order. Your order has been sent to the ${state.branch} branch.</p>
+            <p class="text-gray-600 mb-6">Thank you for your order. Your order has been sent to the ${escHtml(state.branch)} branch.</p>
             <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
               <p class="text-sm text-gray-500">Order ID</p>
-              <p class="font-mono font-medium">${state.lastOrderId}</p>
+              <p class="font-mono font-medium">${escHtml(state.lastOrderId || '')}</p>
               <p class="text-sm text-gray-500 mt-2">Shop Name</p>
-              <p class="font-medium">${state.shopName}</p>
+              <p class="font-medium">${escHtml(state.shopName)}</p>
               <p class="text-sm text-gray-500 mt-2">Your Email</p>
-              <p class="font-medium">${state.contactEmail}</p>
+              <p class="font-medium">${escHtml(state.contactEmail)}</p>
               <p class="text-sm text-gray-500 mt-2">Deliver from Branch</p>
-              <p class="font-medium">${state.branch}</p>
-              <p class="text-xs text-slate-400 mt-1">
-                <i class="fas fa-envelope mr-1"></i>
-                Order sent to: ${branchEmail}
-              </p>
+              <p class="font-medium">${escHtml(state.branch)}</p>
+              ${branchEmail ? `
+                <p class="text-xs text-slate-400 mt-1">
+                  <i class="fas fa-envelope mr-1"></i>
+                  Order sent to: ${branchEmail}
+                </p>
+              ` : ''}
             </div>
             <button onclick="resetOrder()" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-semibold transition-colors">
               Place Another Order
@@ -1090,13 +999,26 @@
       `;
     }
 
+    // ========================================
+    // TOAST
+    // ========================================
     function renderToast() {
       return `
         <div class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
           <i class="fas fa-check"></i>
-          <span>${state.toast}</span>
+          <span>${escHtml(state.toast || '')}</span>
         </div>
       `;
+    }
+
+    // ========================================
+    // HELPERS
+    // ========================================
+    function escHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
     }
 
     function attachEventListeners() {
@@ -1106,22 +1028,10 @@
       }
     }
 
-    function handleSubmitOrder() {
-      const shopName = document.getElementById('shopNameInput')?.value || '';
-      const email = document.getElementById('emailInput')?.value || '';
-      const branch = document.getElementById('branchSelect')?.value || '';
-      
-      state.shopName = shopName;
-      state.contactEmail = email;
-      state.branch = branch;
-      
-      submitOrder();
-    }
-
     // ========================================
-    // INITIALIZE APP
+    // START
     // ========================================
-    render();
+    initApp();
   </script>
 </body>
 </html>
