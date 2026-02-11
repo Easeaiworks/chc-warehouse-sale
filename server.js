@@ -1396,30 +1396,41 @@ app.get('/api/health', async (req, res) => {
   const checks = {
     server: 'ok',
     supabase_url: supabaseUrl ? 'configured' : 'MISSING',
-    supabase_key: supabaseServiceKey ? 'configured' : 'MISSING',
+    supabase_key_length: supabaseServiceKey?.length || 0,
+    supabase_key_prefix: supabaseServiceKey?.substring(0, 10) || 'MISSING',
     jwt_secret: JWT_SECRET !== 'change-this-in-production' ? 'configured' : 'using default (insecure)',
     email: transporter ? 'configured' : 'not configured',
     tables: {}
   };
 
-  // Test Supabase connectivity and tables
-  try {
-    const tables = ['admin_users', 'sales', 'products', 'orders'];
-    for (const table of tables) {
-      try {
-        const { count, error } = await supabase
-          .from(table)
-          .select('*', { count: 'exact', head: true });
-        checks.tables[table] = error ? `ERROR: ${error.message}` : `ok (${count || 0} rows)`;
-      } catch (e) {
-        checks.tables[table] = `ERROR: ${e.message}`;
+  // Test Supabase connectivity via raw HTTP
+  const tables = ['admin_users', 'sales', 'products', 'orders'];
+  for (const table of tables) {
+    try {
+      const url = `${supabaseUrl}/rest/v1/${table}?select=count&limit=0`;
+      const response = await fetch(url, {
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Prefer': 'count=exact'
+        }
+      });
+
+      if (response.ok) {
+        const range = response.headers.get('content-range');
+        const match = range?.match(/\/(\d+)/);
+        const count = match ? parseInt(match[1]) : 0;
+        checks.tables[table] = `ok (${count} rows)`;
+      } else {
+        const body = await response.text();
+        checks.tables[table] = `HTTP ${response.status}: ${body.substring(0, 100)}`;
       }
+    } catch (e) {
+      checks.tables[table] = `FETCH ERROR: ${e.message}`;
     }
-    checks.supabase_connection = 'ok';
-  } catch (e) {
-    checks.supabase_connection = `ERROR: ${e.message}`;
   }
 
+  checks.supabase_connection = checks.tables.orders?.startsWith('ok') ? 'ok' : 'ERROR';
   res.json(checks);
 });
 
@@ -1428,26 +1439,83 @@ app.get('/api/health', async (req, res) => {
 // ========================================
 async function bootstrapAdmin() {
   try {
-    console.log('Checking for existing admin users...');
+    console.log('=== STARTUP DIAGNOSTICS ===');
+    console.log('Supabase URL:', supabaseUrl);
+    console.log('Service key length:', supabaseServiceKey?.length);
+    console.log('Service key starts with:', supabaseServiceKey?.substring(0, 20) + '...');
 
-    // Test connection first
-    const { count, error: countError } = await supabase
-      .from('admin_users')
-      .select('*', { count: 'exact', head: true });
-
-    if (countError) {
-      console.error('Cannot check admin_users table:', countError.message);
-      console.error('Full error:', JSON.stringify(countError, null, 2));
-      console.log('The admin_users table may not exist. Please run the migration SQL in Supabase.');
+    // Step 1: Test raw HTTP connection to Supabase
+    console.log('Testing raw HTTP connection to Supabase...');
+    try {
+      const testUrl = `${supabaseUrl}/rest/v1/orders?select=count&limit=0`;
+      const testRes = await fetch(testUrl, {
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'count=exact'
+        }
+      });
+      console.log('Raw HTTP test - Status:', testRes.status, testRes.statusText);
+      if (!testRes.ok) {
+        const body = await testRes.text();
+        console.error('Raw HTTP test - Body:', body);
+        console.error('This likely means your SUPABASE_SERVICE_KEY is wrong.');
+        console.error('Go to Supabase Dashboard > Settings > API > service_role key');
+        return;
+      } else {
+        console.log('Raw HTTP connection to Supabase: OK');
+      }
+    } catch (fetchErr) {
+      console.error('Raw HTTP fetch failed:', fetchErr.message);
+      console.error('Cannot reach Supabase at all. Check SUPABASE_URL.');
       return;
     }
 
-    if (count && count > 0) {
-      console.log(`Found ${count} admin user(s) — skipping bootstrap.`);
+    // Step 2: Check if admin_users table exists via raw HTTP
+    console.log('Checking admin_users table via raw HTTP...');
+    try {
+      const adminUrl = `${supabaseUrl}/rest/v1/admin_users?select=count&limit=0`;
+      const adminRes = await fetch(adminUrl, {
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'count=exact'
+        }
+      });
+      console.log('admin_users HTTP status:', adminRes.status);
+
+      if (adminRes.status === 404 || adminRes.status === 406) {
+        const body = await adminRes.text();
+        console.error('admin_users table does NOT exist:', body);
+        console.log('Please run the migration SQL in Supabase SQL Editor.');
+        return;
+      }
+
+      if (!adminRes.ok) {
+        const body = await adminRes.text();
+        console.error('admin_users table error:', adminRes.status, body);
+        return;
+      }
+
+      const contentRange = adminRes.headers.get('content-range');
+      console.log('admin_users content-range:', contentRange);
+      // content-range looks like "0-0/0" or "*/0" for empty table
+      const totalMatch = contentRange?.match(/\/(\d+)/);
+      const totalCount = totalMatch ? parseInt(totalMatch[1]) : 0;
+      console.log('admin_users count:', totalCount);
+
+      if (totalCount > 0) {
+        console.log(`Found ${totalCount} admin user(s) — skipping bootstrap.`);
+        return;
+      }
+    } catch (fetchErr) {
+      console.error('admin_users check failed:', fetchErr.message);
       return;
     }
 
-    // No admins exist — create the default super admin
+    // Step 3: No admins exist — create the default super admin
     const defaultEmail = process.env.ADMIN_EMAIL || 'adamberube@me.com';
     const defaultPassword = process.env.ADMIN_PASSWORD || 'CHCadmin2026!';
     const defaultName = process.env.ADMIN_NAME || 'Adam Berube';
@@ -1456,34 +1524,48 @@ async function bootstrapAdmin() {
 
     const passwordHash = await bcrypt.hash(defaultPassword, BCRYPT_ROUNDS);
 
-    const { data: newAdmin, error: insertError } = await supabase
-      .from('admin_users')
-      .insert({
-        email: defaultEmail.toLowerCase(),
-        password_hash: passwordHash,
-        role: 'super_admin',
-        name: defaultName,
-        is_active: true
-      })
-      .select('id, email, role, name')
-      .single();
+    // Use raw HTTP to insert (bypasses any client issues)
+    try {
+      const insertUrl = `${supabaseUrl}/rest/v1/admin_users`;
+      const insertRes = await fetch(insertUrl, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          email: defaultEmail.toLowerCase(),
+          password_hash: passwordHash,
+          role: 'super_admin',
+          name: defaultName,
+          is_active: true
+        })
+      });
 
-    if (insertError) {
-      console.error('Failed to create bootstrap admin:', insertError.message);
-      console.error('Full error:', JSON.stringify(insertError, null, 2));
-      console.log('You may need to check RLS policies or table permissions in Supabase.');
-      return;
+      console.log('Insert admin HTTP status:', insertRes.status);
+
+      if (!insertRes.ok) {
+        const body = await insertRes.text();
+        console.error('Failed to insert admin:', insertRes.status, body);
+        return;
+      }
+
+      const newAdmin = await insertRes.json();
+      console.log('=================================================');
+      console.log('DEFAULT ADMIN CREATED SUCCESSFULLY');
+      console.log(`  Email:    ${defaultEmail}`);
+      console.log(`  Password: ${defaultPassword}`);
+      console.log(`  Role:     super_admin`);
+      console.log('  CHANGE THIS PASSWORD AFTER FIRST LOGIN!');
+      console.log('=================================================');
+    } catch (insertErr) {
+      console.error('Insert fetch failed:', insertErr.message);
     }
-
-    console.log('=================================================');
-    console.log('DEFAULT ADMIN CREATED SUCCESSFULLY');
-    console.log(`  Email:    ${defaultEmail}`);
-    console.log(`  Password: ${defaultPassword}`);
-    console.log(`  Role:     super_admin`);
-    console.log('  CHANGE THIS PASSWORD AFTER FIRST LOGIN!');
-    console.log('=================================================');
   } catch (err) {
     console.error('Bootstrap error:', err.message);
+    console.error('Full stack:', err.stack);
   }
 }
 
