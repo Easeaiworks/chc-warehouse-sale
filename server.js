@@ -85,9 +85,9 @@ const upload = multer({
 
 // Rate limiting (in-memory)
 const authAttempts = new Map();
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000;
+const RATE_LIMIT_WINDOW = 5 * 60 * 1000; // 5 minutes (reduced from 15)
 
-function checkRateLimit(ip, maxAttempts = 10) {
+function checkRateLimit(ip, maxAttempts = 20) {
   const now = Date.now();
   const attempts = authAttempts.get(ip) || [];
   const recent = attempts.filter(t => now - t < RATE_LIMIT_WINDOW);
@@ -99,6 +99,10 @@ function recordAttempt(ip) {
   const attempts = authAttempts.get(ip) || [];
   attempts.push(Date.now());
   authAttempts.set(ip, attempts);
+}
+
+function clearRateLimit(ip) {
+  authAttempts.delete(ip);
 }
 
 // ========================================
@@ -241,8 +245,8 @@ app.post('/api/admin/auth/register', async (req, res) => {
 app.post('/api/admin/auth/login', async (req, res) => {
   const ip = req.ip || req.connection.remoteAddress;
 
-  if (!checkRateLimit(ip, 5)) {
-    return res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+  if (!checkRateLimit(ip, 20)) {
+    return res.status(429).json({ error: 'Too many login attempts. Please wait 5 minutes.' });
   }
 
   recordAttempt(ip);
@@ -284,6 +288,9 @@ app.post('/api/admin/auth/login', async (req, res) => {
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    // Clear rate limit on successful login
+    clearRateLimit(ip);
 
     console.log(`Admin login: ${admin.email}`);
     res.json({
