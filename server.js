@@ -164,13 +164,15 @@ app.post('/api/admin/auth/register', async (req, res) => {
     }
 
     // Check if any admins exist
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('admin_users')
       .select('*', { count: 'exact', head: true });
 
+    console.log('Admin count check:', { count, countError });
+
     let role = 'admin';
 
-    if (count === 0) {
+    if (!count || count === 0) {
       // First admin registration — becomes super_admin
       role = 'super_admin';
     } else {
