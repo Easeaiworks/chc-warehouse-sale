@@ -67,23 +67,12 @@ if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
 app.set('trust proxy', 1);
 
 // Helmet: Sets security HTTP headers
+// CSP disabled for now — app uses inline scripts/handlers extensively
+// All other security headers remain active (HSTS, X-Frame-Options, etc.)
+// TODO: Re-enable CSP after refactoring inline handlers to event listeners
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      upgradeInsecureRequests: [],
-    },
-  },
-  crossOriginEmbedderPolicy: false,  // Allow loading external fonts
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
   hsts: {
     maxAge: 31536000,         // 1 year
     includeSubDomains: true,
