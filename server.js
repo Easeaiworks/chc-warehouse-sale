@@ -1573,6 +1573,144 @@ async function bootstrapAdmin() {
 }
 
 // ========================================
+// AUTO-BOOTSTRAP: Create default sale + products on startup
+// ========================================
+async function bootstrapSale() {
+  try {
+    // Check if any sales exist
+    const salesUrl = `${supabaseUrl}/rest/v1/sales?select=count&limit=0`;
+    const salesRes = await fetch(salesUrl, {
+      headers: {
+        'apikey': supabaseServiceKey,
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Prefer': 'count=exact'
+      }
+    });
+
+    if (!salesRes.ok) {
+      console.log('Cannot check sales table — skipping sale bootstrap.');
+      return;
+    }
+
+    const range = salesRes.headers.get('content-range');
+    const match = range?.match(/\/(\d+)/);
+    const salesCount = match ? parseInt(match[1]) : 0;
+
+    if (salesCount > 0) {
+      console.log(`Found ${salesCount} sale(s) — skipping sale bootstrap.`);
+      return;
+    }
+
+    console.log('No sales found. Creating default Warehouse Sale 2026...');
+
+    // Create the sale with password CHC2026!
+    const salePassword = process.env.SALE_PASSWORD || 'CHC2026!';
+    const saleHash = await bcrypt.hash(salePassword, BCRYPT_ROUNDS);
+
+    const createSaleRes = await fetch(`${supabaseUrl}/rest/v1/sales`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseServiceKey,
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        name: 'Warehouse Sale 2026',
+        slug: 'warehouse-2026',
+        description: 'CHC Paint Annual Warehouse Sale — Exclusive dealer pricing on premium brands.',
+        password_hash: saleHash,
+        status: 'active',
+        start_date: new Date().toISOString(),
+        end_date: null
+      })
+    });
+
+    if (!createSaleRes.ok) {
+      const body = await createSaleRes.text();
+      console.error('Failed to create default sale:', createSaleRes.status, body);
+      return;
+    }
+
+    const saleData = await createSaleRes.json();
+    const saleId = Array.isArray(saleData) ? saleData[0].id : saleData.id;
+    console.log(`Default sale created: ${saleId}`);
+
+    // Load products from CSV file
+    const csvPath = path.join(__dirname, 'warehouse-sale-2026-products.csv');
+    const fs = require('fs');
+
+    if (!fs.existsSync(csvPath)) {
+      console.log('No products CSV found at', csvPath, '— sale created without products.');
+      return;
+    }
+
+    console.log('Loading products from CSV...');
+    const products = [];
+
+    await new Promise((resolve, reject) => {
+      const stream = fs.createReadStream(csvPath);
+      stream
+        .pipe(csv())
+        .on('data', (row) => {
+          const prevPrice = parseFloat(row.previous_price);
+          const salePrice = parseFloat(row.sale_price);
+
+          if (row.sku && row.brand && row.name && !isNaN(prevPrice) && !isNaN(salePrice)) {
+            products.push({
+              sale_id: saleId,
+              sku: row.sku.trim(),
+              brand: row.brand.trim(),
+              category: (row.category || '').trim(),
+              name: row.name.trim(),
+              previous_price: prevPrice,
+              sale_price: salePrice,
+              promo: row.promo?.trim() || null
+            });
+          }
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    console.log(`Parsed ${products.length} products from CSV.`);
+
+    // Insert products in batches of 100
+    let inserted = 0;
+    for (let i = 0; i < products.length; i += 100) {
+      const batch = products.slice(i, i + 100);
+      const insertRes = await fetch(`${supabaseUrl}/rest/v1/products`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(batch)
+      });
+
+      if (insertRes.ok) {
+        inserted += batch.length;
+      } else {
+        const body = await insertRes.text();
+        console.error(`Product batch insert failed:`, insertRes.status, body);
+      }
+    }
+
+    console.log('=================================================');
+    console.log('DEFAULT SALE CREATED SUCCESSFULLY');
+    console.log(`  Name:     Warehouse Sale 2026`);
+    console.log(`  Password: ${salePassword}`);
+    console.log(`  Products: ${inserted} loaded`);
+    console.log(`  Status:   ACTIVE`);
+    console.log('=================================================');
+  } catch (err) {
+    console.error('Sale bootstrap error:', err.message);
+  }
+}
+
+// ========================================
 // GLOBAL ERROR HANDLER
 // ========================================
 app.use((err, req, res, next) => {
@@ -1617,6 +1755,7 @@ app.listen(PORT, async () => {
   console.log(`Supabase connected: ${supabaseUrl}`);
   console.log(`Email notifications: ${transporter ? 'enabled' : 'disabled'}`);
 
-  // Auto-bootstrap first admin
+  // Auto-bootstrap first admin, then default sale + products
   await bootstrapAdmin();
+  await bootstrapSale();
 });
