@@ -1086,7 +1086,8 @@ app.get('/api/sales/:saleId/products', async (req, res) => {
           name: p.name,
           previousPrice: p.previous_price.toString(),
           salePrice: p.sale_price.toString(),
-          promo: p.promo || undefined
+          promo: p.promo || undefined,
+          caseQty: p.case_qty || 1
         });
       } else {
         grouped[p.brand].products.push({
@@ -1094,7 +1095,8 @@ app.get('/api/sales/:saleId/products', async (req, res) => {
           name: p.name,
           previousPrice: p.previous_price.toString(),
           salePrice: p.sale_price.toString(),
-          promo: p.promo || undefined
+          promo: p.promo || undefined,
+          caseQty: p.case_qty || 1
         });
       }
     });
@@ -1585,56 +1587,87 @@ async function bootstrapSale() {
     const match = range?.match(/\/(\d+)/);
     const salesCount = match ? parseInt(match[1]) : 0;
 
+    // Get or create default sale
+    let saleId;
+
     if (salesCount > 0) {
-      console.log(`Found ${salesCount} sale(s) — skipping sale bootstrap.`);
+      console.log(`Found ${salesCount} sale(s). Checking for product updates...`);
+      // Get the first active sale's ID for product refresh
+      const getSaleRes = await fetch(`${supabaseUrl}/rest/v1/sales?status=eq.active&limit=1`, {
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`
+        }
+      });
+      if (getSaleRes.ok) {
+        const sales = await getSaleRes.json();
+        if (sales.length > 0) saleId = sales[0].id;
+      }
+    } else {
+      console.log('No sales found. Creating default Warehouse Sale 2026...');
+
+      const salePassword = process.env.SALE_PASSWORD || 'CHC2026!';
+      const saleHash = await bcrypt.hash(salePassword, BCRYPT_ROUNDS);
+
+      const createSaleRes = await fetch(`${supabaseUrl}/rest/v1/sales`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          name: 'Warehouse Sale 2026',
+          slug: 'warehouse-2026',
+          description: 'CHC Paint Annual Warehouse Sale — Exclusive dealer pricing on premium brands.',
+          password_hash: saleHash,
+          status: 'active',
+          start_date: new Date().toISOString(),
+          end_date: null
+        })
+      });
+
+      if (!createSaleRes.ok) {
+        const body = await createSaleRes.text();
+        console.error('Failed to create default sale:', createSaleRes.status, body);
+        return;
+      }
+
+      const saleData = await createSaleRes.json();
+      saleId = Array.isArray(saleData) ? saleData[0].id : saleData.id;
+      console.log(`Default sale created: ${saleId}`);
+    }
+
+    if (!saleId) {
+      console.log('No active sale found — skipping product load.');
       return;
     }
 
-    console.log('No sales found. Creating default Warehouse Sale 2026...');
-
-    // Create the sale with password CHC2026!
-    const salePassword = process.env.SALE_PASSWORD || 'CHC2026!';
-    const saleHash = await bcrypt.hash(salePassword, BCRYPT_ROUNDS);
-
-    const createSaleRes = await fetch(`${supabaseUrl}/rest/v1/sales`, {
-      method: 'POST',
-      headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      },
-      body: JSON.stringify({
-        name: 'Warehouse Sale 2026',
-        slug: 'warehouse-2026',
-        description: 'CHC Paint Annual Warehouse Sale — Exclusive dealer pricing on premium brands.',
-        password_hash: saleHash,
-        status: 'active',
-        start_date: new Date().toISOString(),
-        end_date: null
-      })
-    });
-
-    if (!createSaleRes.ok) {
-      const body = await createSaleRes.text();
-      console.error('Failed to create default sale:', createSaleRes.status, body);
-      return;
-    }
-
-    const saleData = await createSaleRes.json();
-    const saleId = Array.isArray(saleData) ? saleData[0].id : saleData.id;
-    console.log(`Default sale created: ${saleId}`);
-
-    // Load products from CSV file
-    const csvPath = path.join(__dirname, 'warehouse-sale-2026-products.csv');
+    // Load products from CSV file (v2 with case_qty)
+    const csvPath = path.join(__dirname, 'warehouse-sale-2026-products-v2.csv');
     const fs = require('fs');
 
     if (!fs.existsSync(csvPath)) {
-      console.log('No products CSV found at', csvPath, '— sale created without products.');
+      console.log('No products CSV found at', csvPath);
       return;
     }
 
-    console.log('Loading products from CSV...');
+    // Check current product count for this sale
+    const prodCountRes = await fetch(`${supabaseUrl}/rest/v1/products?sale_id=eq.${saleId}&select=count&limit=0`, {
+      headers: {
+        'apikey': supabaseServiceKey,
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Prefer': 'count=exact'
+      }
+    });
+    const prodRange = prodCountRes.headers.get('content-range');
+    const prodMatch = prodRange?.match(/\/(\d+)/);
+    const currentProductCount = prodMatch ? parseInt(prodMatch[1]) : 0;
+
+    console.log(`Current products in sale: ${currentProductCount}`);
+
+    console.log('Loading products from CSV v2...');
     const products = [];
 
     await new Promise((resolve, reject) => {
@@ -1654,7 +1687,8 @@ async function bootstrapSale() {
               name: row.name.trim(),
               previous_price: prevPrice,
               sale_price: salePrice,
-              promo: row.promo?.trim() || null
+              promo: row.promo?.trim() || null,
+              case_qty: parseInt(row.case_qty) || 1
             });
           }
         })
@@ -1663,6 +1697,24 @@ async function bootstrapSale() {
     });
 
     console.log(`Parsed ${products.length} products from CSV.`);
+
+    // Skip if product count matches (already loaded)
+    if (currentProductCount >= products.length) {
+      console.log(`Products already loaded (${currentProductCount} >= ${products.length}) — skipping.`);
+      return;
+    }
+
+    // Delete old products for this sale and reload
+    if (currentProductCount > 0) {
+      console.log(`Clearing ${currentProductCount} old products...`);
+      await fetch(`${supabaseUrl}/rest/v1/products?sale_id=eq.${saleId}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`
+        }
+      });
+    }
 
     // Insert products in batches of 100
     let inserted = 0;
@@ -1688,10 +1740,9 @@ async function bootstrapSale() {
     }
 
     console.log('=================================================');
-    console.log('DEFAULT SALE CREATED SUCCESSFULLY');
-    console.log(`  Name:     Warehouse Sale 2026`);
-    console.log(`  Password: ${salePassword}`);
-    console.log(`  Products: ${inserted} loaded`);
+    console.log('PRODUCTS LOADED SUCCESSFULLY');
+    console.log(`  Sale:     Warehouse Sale 2026`);
+    console.log(`  Products: ${inserted} loaded (was ${currentProductCount})`);
     console.log(`  Status:   ACTIVE`);
     console.log('=================================================');
   } catch (err) {

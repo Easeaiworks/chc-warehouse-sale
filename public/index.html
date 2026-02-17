@@ -341,23 +341,62 @@
       render();
     }
 
+    // ========================================
+    // PROMO RULES (applied client-side)
+    // ========================================
+    const PROMO_RULES = {
+      "MMM01131": { type: "per_case", pay: 3, get: 4, message: "Buy 3 Gallons Get 1 Gallon free" },
+      "SEM39694": { type: "per_case", pay: 5, get: 6, message: "Buy 5 Get 1 Free" },
+      "SEM40494": { type: "per_case", pay: 5, get: 6, message: "Buy 5 Get 1 Free" },
+      "SEM40504": { type: "per_case", pay: 5, get: 6, message: "Buy 5 Get 1 Free" },
+      "SEM39774": { type: "per_case", pay: 5, get: 6, message: "Buy 5 Get 1 Free" },
+      "SEM40434": { type: "per_case", pay: 5, get: 6, message: "Buy 5 Get 1 Free" }
+    };
+
+    function getCaseQty(product) {
+      return product.caseQty || 1;
+    }
+
+    function getPromoInfo(sku, quantity) {
+      const rule = PROMO_RULES[sku];
+      if (!rule) return null;
+
+      if (rule.type === 'per_case') {
+        const cases = Math.floor(quantity / rule.get);
+        const freeUnits = cases;
+        return {
+          type: 'per_case',
+          message: rule.message,
+          freeUnits,
+          effectiveQty: quantity - freeUnits,
+          pay: rule.pay,
+          get: rule.get
+        };
+      }
+      return null;
+    }
+
     function addToCart(product) {
+      const caseQty = getCaseQty(product);
       const existing = state.cart.find(item => item.sku === product.sku);
       if (existing) {
-        existing.quantity++;
+        existing.quantity += caseQty;
       } else {
-        state.cart.push({ ...product, quantity: 1 });
+        state.cart.push({ ...product, quantity: caseQty });
       }
-      showToast(`Added ${product.sku} to cart`);
+      showToast(`Added ${caseQty} x ${product.sku} to cart`);
       render();
     }
 
     function updateQuantity(sku, delta) {
       const item = state.cart.find(i => i.sku === sku);
       if (item) {
-        item.quantity += delta;
-        if (item.quantity <= 0) {
+        const caseQty = getCaseQty(item);
+        const newQty = item.quantity + (delta * caseQty);
+        if (newQty < caseQty) {
           state.cart = state.cart.filter(i => i.sku !== sku);
+        } else {
+          item.quantity = newQty;
         }
       }
       render();
@@ -749,6 +788,7 @@
                     <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Description</th>
                     <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">AE Price</th>
                     <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Sale Price</th>
+                    <th class="text-center px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Case Qty</th>
                     <th class="text-right px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Action</th>
                   </tr>
                 </thead>
@@ -789,6 +829,27 @@
       const inCart = state.cart.find(item => item.sku === product.sku);
       const discount = getDiscount(product.previousPrice, product.salePrice);
       const hasPromo = product.promo ? true : false;
+      const caseQty = getCaseQty(product);
+      const promoRule = PROMO_RULES[product.sku];
+
+      // Case quantity display
+      let caseQtyHtml = '';
+      if (caseQty > 1) {
+        if (promoRule && promoRule.type === 'per_case') {
+          caseQtyHtml = `
+            <div class="flex flex-col gap-1">
+              <span class="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 text-sm font-medium rounded">
+                <i class="fas fa-boxes text-xs"></i>${caseQty}
+              </span>
+              <span class="text-xs text-green-600 font-semibold">(${promoRule.pay} + 1 FREE)</span>
+            </div>`;
+        } else {
+          caseQtyHtml = `
+            <span class="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 text-sm font-medium rounded">
+              <i class="fas fa-boxes text-xs"></i>${caseQty}
+            </span>`;
+        }
+      }
 
       return `
         <tr class="hover:bg-slate-50 transition-colors ${hasPromo ? 'bg-green-50' : ''}">
@@ -808,6 +869,7 @@
               ${discount > 0 ? `<span class="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">${discount}% OFF</span>` : ''}
             </div>
           </td>
+          <td class="px-4 py-4 text-center">${caseQtyHtml}</td>
           <td class="px-4 py-4 text-right">
             ${inCart ? `
               <div class="inline-flex items-center gap-2 bg-slate-100 rounded-lg px-2 py-1">
@@ -821,7 +883,7 @@
               </div>
             ` : `
               <button onclick='addToCart(${JSON.stringify(product).replace(/'/g, "&#39;")})' class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition-colors">
-                <i class="fas fa-plus"></i> Add
+                <i class="fas fa-plus"></i> Add ${caseQty > 1 ? caseQty : ''}
               </button>
             `}
           </td>
@@ -855,12 +917,18 @@
                 </div>
               ` : `
                 <div class="space-y-3">
-                  ${state.cart.map(item => `
+                  ${state.cart.map(item => {
+                    const caseQty = getCaseQty(item);
+                    const numCases = caseQty > 1 ? Math.floor(item.quantity / caseQty) : item.quantity;
+                    const promoInfo = getPromoInfo(item.sku, item.quantity);
+                    return `
                     <div class="bg-slate-50 rounded-lg p-3">
                       <div class="flex justify-between items-start mb-2">
                         <div class="flex-1 min-w-0">
                           <p class="font-mono text-sm text-blue-600">${escHtml(item.sku)}</p>
                           <p class="font-medium text-sm truncate">${escHtml(item.name)}</p>
+                          ${caseQty > 1 ? `<p class="text-xs text-slate-500 mt-1">${numCases} case(s) × ${caseQty} = ${item.quantity} units</p>` : ''}
+                          ${promoInfo ? `<div class="mt-1 bg-green-100 text-green-800 text-xs px-2 py-1 rounded"><i class="fas fa-gift mr-1"></i>${promoInfo.message}</div>` : ''}
                         </div>
                         <button onclick="removeFromCart('${escHtml(item.sku)}')" class="p-1 text-red-500 hover:bg-red-50 rounded ml-2">
                           <i class="fas fa-trash text-sm"></i>
@@ -879,7 +947,7 @@
                         <p class="font-bold text-green-600">$${formatPrice(parseFloat(item.salePrice) * item.quantity)}</p>
                       </div>
                     </div>
-                  `).join('')}
+                  `}).join('')}
                 </div>
               `}
             </div>
