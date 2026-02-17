@@ -794,7 +794,7 @@
                   <tr>
                     <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">SKU</th>
                     <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Description</th>
-                    <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">AE Price</th>
+                    <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Retail Price</th>
                     <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Sale Price</th>
                     <th class="text-center px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Case Qty</th>
                     <th class="text-right px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Action</th>
@@ -819,7 +819,7 @@
                 <tr>
                   <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">SKU</th>
                   <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Description</th>
-                  <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">AE Price</th>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Retail Price</th>
                   <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Sale Price</th>
                   <th class="text-right px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Action</th>
                 </tr>
@@ -935,7 +935,7 @@
                         <div class="flex-1 min-w-0">
                           <p class="font-mono text-sm text-blue-600">${escHtml(item.sku)}</p>
                           <p class="font-medium text-sm truncate">${escHtml(item.name)}</p>
-                          ${caseQty > 1 ? `<p class="text-xs text-slate-500 mt-1">${numCases} case(s) × ${caseQty} = ${item.quantity} units</p>` : ''}
+                          <p class="text-xs text-slate-500 mt-1">$${formatPrice(item.salePrice)}/ea × ${item.quantity} units</p>
                           ${promoInfo ? `<div class="mt-1 bg-green-100 text-green-800 text-xs px-2 py-1 rounded"><i class="fas fa-gift mr-1"></i>${promoInfo.message}</div>` : ''}
                         </div>
                         <button onclick="removeFromCart('${escHtml(item.sku)}')" class="p-1 text-red-500 hover:bg-red-50 rounded ml-2">
