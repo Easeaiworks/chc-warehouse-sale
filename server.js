@@ -1182,6 +1182,7 @@ app.post('/api/orders', async (req, res) => {
     const items = req.body.items;
     const total = req.body.total;
     const sale_id = req.body.sale_id;
+    const rawOrderNotes = req.body.orderNotes;
 
     if (!rawShopName || !rawEmail || !rawBranch || !items || items.length === 0) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -1207,13 +1208,18 @@ app.post('/api/orders', async (req, res) => {
       return res.status(400).json({ error: 'Invalid items list' });
     }
 
+    // Sanitize order notes
+    const orderNotes = rawOrderNotes ? sanitize(String(rawOrderNotes)).substring(0, 1000) : '';
+
     // Sanitize each item
     const sanitizedItems = items.map(item => ({
       sku: sanitize(String(item.sku || '')),
       name: sanitize(String(item.name || '')),
       quantity: Math.max(1, Math.min(9999, parseInt(item.quantity) || 1)),
       salePrice: parseFloat(item.salePrice) || 0,
-      brand: sanitize(String(item.brand || ''))
+      brand: sanitize(String(item.brand || '')),
+      caseQty: Math.max(1, parseInt(item.caseQty) || 1),
+      promoMessage: item.promoMessage ? sanitize(String(item.promoMessage)).substring(0, 200) : null
     }));
 
     const orderCode = `ORD-${Date.now().toString(36).toUpperCase()}`;
@@ -1225,7 +1231,8 @@ app.post('/api/orders', async (req, res) => {
       branch,
       items: sanitizedItems,
       total: parseFloat(total),
-      status: 'pending'
+      status: 'pending',
+      notes: orderNotes || null
     };
 
     if (sale_id) orderData.sale_id = sale_id;
@@ -1267,9 +1274,48 @@ async function sendOrderEmail(order) {
   const branchEmail = BRANCH_EMAILS[order.branch];
   if (!branchEmail) return;
 
-  const itemsList = order.items.map(item =>
-    `  ${item.sku} - ${item.name} x${item.quantity} @ $${parseFloat(item.salePrice).toFixed(2)} = $${(parseFloat(item.salePrice) * item.quantity).toFixed(2)}`
-  ).join('\n');
+  // Build plain text items with case qty and promo info
+  const itemsText = order.items.map(item => {
+    const caseQty = item.caseQty || 1;
+    const numCases = Math.floor(item.quantity / caseQty);
+    const lineTotal = (parseFloat(item.salePrice) * item.quantity).toFixed(2);
+    let line = `${item.sku} - ${item.name}\n    $${parseFloat(item.salePrice).toFixed(2)}/ea | Qty: ${item.quantity}`;
+    if (caseQty > 1) line += ` (${numCases} case${numCases !== 1 ? 's' : ''} x ${caseQty})`;
+    line += ` | Total: $${lineTotal}`;
+    if (item.promoMessage) line += `\n    *** PROMO: ${item.promoMessage} - Already included ***`;
+    return line;
+  }).join('\n\n');
+
+  const notesText = order.notes ? `\n\n--- CUSTOMER NOTES ---\n${order.notes}\n----------------------` : '';
+
+  // Build HTML item rows with case qty and promo info
+  const itemRowsHtml = order.items.map(item => {
+    const caseQty = item.caseQty || 1;
+    const numCases = Math.floor(item.quantity / caseQty);
+    const lineTotal = (parseFloat(item.salePrice) * item.quantity).toFixed(2);
+    let qtyDisplay = `${item.quantity}`;
+    if (caseQty > 1) {
+      qtyDisplay += `<br><span style="font-size: 11px; color: #64748b;">${numCases} case${numCases !== 1 ? 's' : ''} &times; ${caseQty}</span>`;
+    }
+    let promoHtml = '';
+    if (item.promoMessage) {
+      promoHtml = `<tr><td colspan="4" style="padding: 2px 8px 8px; font-size: 11px; color: #f97316; font-weight: bold;">&#9733; ${item.promoMessage}</td></tr>`;
+    }
+    return `
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 8px; font-family: monospace; color: #2563eb; font-size: 13px;">${item.sku}</td>
+        <td style="padding: 8px; font-size: 13px;">${item.name}</td>
+        <td style="padding: 8px; text-align: center;">${qtyDisplay}</td>
+        <td style="padding: 8px; text-align: right; font-weight: bold; color: #16a34a;">$${lineTotal}</td>
+      </tr>
+      ${promoHtml}`;
+  }).join('');
+
+  const notesHtml = order.notes ? `
+    <div style="background: #fffbeb; border: 1px solid #fbbf24; padding: 12px 16px; border-radius: 8px; margin-top: 16px;">
+      <p style="margin: 0 0 4px; font-weight: bold; color: #92400e; font-size: 13px;">Customer Notes:</p>
+      <p style="margin: 0; color: #78350f; font-size: 13px;">${order.notes.replace(/\n/g, '<br>')}</p>
+    </div>` : '';
 
   const mailOptions = {
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
@@ -1287,7 +1333,7 @@ Branch: ${order.branch}
 Date: ${new Date(order.created_at).toLocaleString()}
 
 Items Ordered:
-${itemsList}
+${itemsText}${notesText}
 
 Order Total: $${parseFloat(order.total).toFixed(2)}
 
@@ -1297,7 +1343,7 @@ This order was submitted via the CHC Paint Warehouse Sale catalog.
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: #1e293b; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
           <h1 style="margin: 0; font-size: 20px;">New Warehouse Sale Order</h1>
-          <p style="margin: 5px 0 0; color: #94a3b8; font-size: 14px;">CHC Paint Warehouse Sale</p>
+          <p style="margin: 5px 0 0; color: #94a3b8; font-size: 14px;">CHC Paint Warehouse Sale 2026</p>
         </div>
         <div style="border: 1px solid #e2e8f0; padding: 20px; border-radius: 0 0 8px 8px;">
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
@@ -1305,6 +1351,7 @@ This order was submitted via the CHC Paint Warehouse Sale catalog.
             <tr><td style="padding: 8px 0; color: #64748b;">Shop Name</td><td style="padding: 8px 0; font-weight: bold;">${order.shop_name}</td></tr>
             <tr><td style="padding: 8px 0; color: #64748b;">Contact Email</td><td style="padding: 8px 0;">${order.email}</td></tr>
             <tr><td style="padding: 8px 0; color: #64748b;">Branch</td><td style="padding: 8px 0; font-weight: bold;">${order.branch}</td></tr>
+            <tr><td style="padding: 8px 0; color: #64748b;">Date</td><td style="padding: 8px 0;">${new Date(order.created_at).toLocaleString()}</td></tr>
           </table>
           <h3 style="border-bottom: 2px solid #f97316; padding-bottom: 8px; color: #1e293b;">Items Ordered</h3>
           <table style="width: 100%; border-collapse: collapse;">
@@ -1313,23 +1360,20 @@ This order was submitted via the CHC Paint Warehouse Sale catalog.
                 <th style="text-align: left; padding: 8px; font-size: 12px; color: #64748b;">SKU</th>
                 <th style="text-align: left; padding: 8px; font-size: 12px; color: #64748b;">Product</th>
                 <th style="text-align: center; padding: 8px; font-size: 12px; color: #64748b;">Qty</th>
-                <th style="text-align: right; padding: 8px; font-size: 12px; color: #64748b;">Price</th>
+                <th style="text-align: right; padding: 8px; font-size: 12px; color: #64748b;">Total</th>
               </tr>
             </thead>
             <tbody>
-              ${order.items.map(item => `
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                  <td style="padding: 8px; font-family: monospace; color: #2563eb; font-size: 13px;">${item.sku}</td>
-                  <td style="padding: 8px; font-size: 13px;">${item.name}</td>
-                  <td style="padding: 8px; text-align: center;">${item.quantity}</td>
-                  <td style="padding: 8px; text-align: right; font-weight: bold; color: #16a34a;">$${(parseFloat(item.salePrice) * item.quantity).toFixed(2)}</td>
-                </tr>
-              `).join('')}
+              ${itemRowsHtml}
             </tbody>
           </table>
+          ${notesHtml}
           <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin-top: 16px; text-align: right;">
-            <span style="font-size: 18px; font-weight: bold; color: #16a34a;">Total: $${parseFloat(order.total).toFixed(2)}</span>
+            <span style="font-size: 18px; font-weight: bold; color: #16a34a;">Order Total: $${parseFloat(order.total).toFixed(2)}</span>
           </div>
+          <p style="margin-top: 16px; color: #94a3b8; font-size: 12px; text-align: center;">
+            This order was submitted via the CHC Paint Warehouse Sale catalog.
+          </p>
         </div>
       </div>
     `
@@ -1349,30 +1393,53 @@ async function sendStatusUpdateEmail(order) {
     cancelled: 'Cancelled'
   };
 
+  const statusColors = {
+    pending: '#f59e0b',
+    confirmed: '#16a34a',
+    shipped: '#2563eb',
+    delivered: '#16a34a',
+    cancelled: '#dc2626'
+  };
+
+  const statusLabel = statusLabels[order.status] || order.status;
+  const statusColor = statusColors[order.status] || '#16a34a';
+
   const mailOptions = {
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to: order.email,
-    subject: `Order ${order.order_code} — Status Update: ${statusLabels[order.status] || order.status}`,
+    subject: `Order ${order.order_code} — Status Update: ${statusLabel}`,
     text: `
 Your order status has been updated.
 
 Order ID: ${order.order_code}
-New Status: ${statusLabels[order.status] || order.status}
+Shop Name: ${order.shop_name}
+New Status: ${statusLabel}
 Branch: ${order.branch}
+Order Total: $${parseFloat(order.total).toFixed(2)}
 
-If you have any questions, contact your CHC Paint branch.
+If you have any questions, contact your CHC Paint ${order.branch} branch.
     `.trim(),
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: #1e293b; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
           <h1 style="margin: 0; font-size: 20px;">Order Status Update</h1>
+          <p style="margin: 5px 0 0; color: #94a3b8; font-size: 14px;">CHC Paint Warehouse Sale 2026</p>
         </div>
         <div style="border: 1px solid #e2e8f0; padding: 20px; border-radius: 0 0 8px 8px;">
-          <p>Your order <strong>${order.order_code}</strong> has been updated to:</p>
-          <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; text-align: center; margin: 16px 0;">
-            <span style="font-size: 24px; font-weight: bold; color: #16a34a;">${statusLabels[order.status] || order.status}</span>
+          <p style="color: #334155;">Your order <strong>${order.order_code}</strong> has been updated:</p>
+          <div style="background: ${statusColor}15; border: 2px solid ${statusColor}; padding: 16px; border-radius: 8px; text-align: center; margin: 16px 0;">
+            <span style="font-size: 24px; font-weight: bold; color: ${statusColor};">${statusLabel}</span>
           </div>
-          <p style="color: #64748b; font-size: 14px;">If you have any questions, contact your CHC Paint ${order.branch} branch.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+            <tr><td style="padding: 6px 0; color: #64748b; width: 120px;">Order ID</td><td style="padding: 6px 0; font-weight: bold;">${order.order_code}</td></tr>
+            <tr><td style="padding: 6px 0; color: #64748b;">Shop Name</td><td style="padding: 6px 0;">${order.shop_name}</td></tr>
+            <tr><td style="padding: 6px 0; color: #64748b;">Branch</td><td style="padding: 6px 0;">${order.branch}</td></tr>
+            <tr><td style="padding: 6px 0; color: #64748b;">Order Total</td><td style="padding: 6px 0; font-weight: bold; color: #16a34a;">$${parseFloat(order.total).toFixed(2)}</td></tr>
+          </table>
+          <p style="color: #64748b; font-size: 14px; margin-top: 16px;">If you have any questions, contact your CHC Paint ${order.branch} branch.</p>
+          <p style="margin-top: 16px; color: #94a3b8; font-size: 12px; text-align: center;">
+            CHC Paint Warehouse Sale catalog
+          </p>
         </div>
       </div>
     `
