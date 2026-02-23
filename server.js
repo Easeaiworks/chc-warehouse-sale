@@ -18,6 +18,12 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
 const BCRYPT_ROUNDS = 12;
 
+// SECURITY: Block startup if JWT_SECRET is the default value in production
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'change-this-in-production') {
+  console.error('FATAL: JWT_SECRET must be set in production. Set a strong random string in your environment variables.');
+  process.exit(1);
+}
+
 // ========================================
 // SUPABASE CLIENT
 // ========================================
@@ -67,11 +73,22 @@ if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
 app.set('trust proxy', 1);
 
 // Helmet: Sets security HTTP headers
-// CSP disabled for now — app uses inline scripts/handlers extensively
-// All other security headers remain active (HSTS, X-Frame-Options, etc.)
-// TODO: Re-enable CSP after refactoring inline handlers to event listeners
+// CSP enabled with allowances for inline scripts + trusted CDNs
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com"],
+      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'", "https://api.emailjs.com"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"]
+    }
+  },
   crossOriginEmbedderPolicy: false,
   hsts: {
     maxAge: 31536000,         // 1 year
@@ -84,15 +101,24 @@ app.use(helmet({
   frameguard: { action: 'deny' },
 }));
 
-// CORS: Lock down to same origin (Railway domain)
+// CORS: Lock down to same origin + configured origins
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : [];
 
+if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV === 'production') {
+  console.warn('WARNING: No ALLOWED_ORIGINS set. CORS will only allow same-origin requests in production.');
+}
+
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow same-origin requests (no origin header) and configured origins
-    if (!origin || ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
+    // Allow same-origin requests (no origin header = browser same-origin or server-to-server)
+    if (!origin) {
+      callback(null, true);
+    } else if (ALLOWED_ORIGINS.length > 0 && ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV !== 'production') {
+      // In dev, allow all origins if none configured
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -1160,10 +1186,23 @@ app.post('/api/auth/verify', async (req, res) => {
       }
     }
 
-    // Legacy fallback: verify against WAREHOUSE_PASSWORD env var
+    // Legacy fallback: verify against WAREHOUSE_PASSWORD env var (bcrypt hashed comparison)
     const correctPassword = process.env.WAREHOUSE_PASSWORD;
-    if (correctPassword && password === correctPassword) {
-      return res.json({ success: true });
+    if (correctPassword) {
+      // Support both hashed and plaintext env values — compare securely either way
+      const isHashed = correctPassword.startsWith('$2b$') || correctPassword.startsWith('$2a$');
+      if (isHashed) {
+        const valid = await bcrypt.compare(password, correctPassword);
+        if (valid) return res.json({ success: true });
+      } else {
+        // Plaintext env var — use timing-safe comparison to prevent timing attacks
+        const crypto = require('crypto');
+        const a = Buffer.from(password);
+        const b = Buffer.from(correctPassword);
+        if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+          return res.json({ success: true });
+        }
+      }
     }
 
     return res.status(401).json({ error: 'Invalid password' });
