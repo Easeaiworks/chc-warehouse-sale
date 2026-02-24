@@ -18,12 +18,6 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
 const BCRYPT_ROUNDS = 12;
 
-// SECURITY: Block startup if JWT_SECRET is the default value in production
-if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'change-this-in-production') {
-  console.error('FATAL: JWT_SECRET must be set in production. Set a strong random string in your environment variables.');
-  process.exit(1);
-}
-
 // ========================================
 // SUPABASE CLIENT
 // ========================================
@@ -72,63 +66,14 @@ if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
 // Trust Railway's proxy for correct IP detection
 app.set('trust proxy', 1);
 
-// Helmet: Sets security HTTP headers
-// CSP enabled with allowances for inline scripts + trusted CDNs
+// Helmet: Sets security HTTP headers (CSP disabled — inline scripts used by frontend)
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com"],
-      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'", "https://api.emailjs.com"],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"]
-    }
-  },
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
-  hsts: {
-    maxAge: 31536000,         // 1 year
-    includeSubDomains: true,
-    preload: true
-  },
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  noSniff: true,
-  xssFilter: true,
-  frameguard: { action: 'deny' },
 }));
 
-// CORS: Lock down to same origin + configured origins
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : [];
-
-if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV === 'production') {
-  console.warn('WARNING: No ALLOWED_ORIGINS set. CORS will only allow same-origin requests in production.');
-}
-
-app.use(cors({
-  origin: function(origin, callback) {
-    // Allow same-origin requests (no origin header = browser same-origin or server-to-server)
-    if (!origin) {
-      callback(null, true);
-    } else if (ALLOWED_ORIGINS.length > 0 && ALLOWED_ORIGINS.includes(origin)) {
-      callback(null, true);
-    } else if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV !== 'production') {
-      // In dev, allow all origins if none configured
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  maxAge: 86400  // Cache preflight for 24h
-}));
+// CORS
+app.use(cors());
 
 // HTTPS enforcement in production (redirect HTTP to HTTPS)
 // Only redirect when x-forwarded-proto header is present (external requests via proxy)
@@ -1233,11 +1178,8 @@ app.post('/api/auth/verify', async (req, res) => {
         const valid = await bcrypt.compare(password, correctPassword);
         if (valid) return res.json({ success: true });
       } else {
-        // Plaintext env var — use timing-safe comparison to prevent timing attacks
-        const crypto = require('crypto');
-        const a = Buffer.from(password);
-        const b = Buffer.from(correctPassword);
-        if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+        // Plaintext env var — simple comparison
+        if (password === correctPassword) {
           return res.json({ success: true });
         }
       }
@@ -1905,11 +1847,6 @@ app.use((err, req, res, next) => {
   if (err.message === 'Only CSV and Excel files are allowed') {
     return res.status(400).json({ error: err.message });
   }
-  // Handle CORS errors
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ error: 'CORS policy violation' });
-  }
-
   console.error('Unhandled error:', err.message);
   res.status(500).json({ error: 'Internal server error' });
 });
