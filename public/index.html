@@ -44,7 +44,8 @@
     //    - {{customer_email}}
     //    - {{branch}}
     //    - {{branch_email}}
-    //    - {{order_items}}
+    //    - {{order_items}}  (plain text version)
+    //    - {{{order_items_html}}}  (HTML table version — use triple braces)
     //    - {{order_total}}
     //    - {{order_id}}
     // 4. Replace the values below with your EmailJS credentials
@@ -878,6 +879,40 @@
       return lines.join('\n');
     }
 
+    function formatOrderItemsHtml() {
+      let html = '';
+      html += '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;">';
+      html += '<tr style="background:#1e293b;color:#fff;"><th style="padding:8px;text-align:left;">SKU</th><th style="padding:8px;text-align:left;">Product</th><th style="padding:8px;text-align:center;">Qty</th><th style="padding:8px;text-align:right;">Total</th></tr>';
+
+      state.cart.forEach((item, i) => {
+        const caseQty = getCaseQty(item.sku);
+        const numCases = Math.floor(item.quantity / caseQty);
+        const lineTotal = parseFloat(item.salePrice) * item.quantity;
+        const bg = i % 2 === 0 ? '#f8fafc' : '#ffffff';
+
+        html += `<tr style="background:${bg};border-bottom:1px solid #e2e8f0;">`;
+        html += `<td style="padding:8px;font-family:monospace;color:#2563eb;">${item.sku}</td>`;
+        html += `<td style="padding:8px;">${item.name}</td>`;
+        html += `<td style="padding:8px;text-align:center;">${item.quantity}</td>`;
+        html += `<td style="padding:8px;text-align:right;font-weight:bold;color:#16a34a;">$${formatPrice(lineTotal)}</td>`;
+        html += '</tr>';
+
+        const promoInfo = getPromoInfo(item);
+        if (promoInfo) {
+          html += `<tr style="background:${bg};"><td colspan="4" style="padding:2px 8px 8px;font-size:12px;color:#f97316;font-weight:bold;">&#9733; ${promoInfo.message}</td></tr>`;
+        }
+      });
+
+      html += `<tr style="background:#f0fdf4;"><td colspan="3" style="padding:12px 8px;font-weight:bold;text-align:right;">Order Total:</td><td style="padding:12px 8px;text-align:right;font-size:18px;font-weight:bold;color:#16a34a;">$${formatPrice(getCartTotal())}</td></tr>`;
+      html += '</table>';
+
+      if (state.orderNotes && state.orderNotes.trim()) {
+        html += `<div style="background:#fffbeb;border:1px solid #fbbf24;padding:12px;border-radius:8px;margin-top:12px;"><strong style="color:#92400e;">Customer Notes:</strong><br><span style="color:#78350f;">${state.orderNotes.trim().replace(/\n/g, '<br>')}</span></div>`;
+      }
+
+      return html;
+    }
+
     // ========================================
     // EMAIL SENDING FUNCTION
     // ========================================
@@ -906,6 +941,7 @@
           branch_email: branchEmail,
           order_id: orderId,
           order_items: formatOrderItems(),
+          order_items_html: formatOrderItemsHtml(),
           order_total: formatPrice(getCartTotal()),
           order_count: getCartCount(),
           order_notes: state.orderNotes || 'None'
