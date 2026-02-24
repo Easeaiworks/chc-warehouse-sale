@@ -1008,6 +1008,44 @@ app.patch('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Delete order (hard delete — permanent removal)
+app.delete('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
+  try {
+    // Fetch order first for audit trail
+    const { data: order, error: fetchError } = await supabase
+      .from('orders')
+      .select('id, order_code, shop_name, email, branch, total')
+      .eq('id', req.params.id)
+      .single();
+
+    if (fetchError || !order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', req.params.id);
+
+    if (deleteError) throw deleteError;
+
+    await auditLog('ORDER_DELETED', req.admin.id, {
+      orderId: order.id,
+      orderCode: order.order_code,
+      shopName: order.shop_name,
+      email: order.email,
+      branch: order.branch,
+      total: order.total
+    });
+
+    console.log(`Order deleted: ${order.order_code} by admin ${req.admin.email}`);
+    res.json({ success: true, deletedOrder: order.order_code });
+  } catch (error) {
+    console.error('Delete order error:', error);
+    res.status(500).json({ error: 'Failed to delete order' });
+  }
+});
+
 // Admin dashboard stats
 app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
   try {
