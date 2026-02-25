@@ -1053,7 +1053,19 @@
       if (existing) {
         existing.quantity += 1;
       } else {
-        state.cart.push({ ...product, quantity: caseQty });
+        // Find the brand this product belongs to
+        let productBrand = '';
+        for (const [brand, data] of Object.entries(PRODUCTS)) {
+          if (data.hasCategories && data.categories) {
+            for (const prods of Object.values(data.categories)) {
+              if (prods.some(p => p.sku === product.sku)) { productBrand = brand; break; }
+            }
+          } else if (data.products) {
+            if (data.products.some(p => p.sku === product.sku)) { productBrand = brand; break; }
+          }
+          if (productBrand) break;
+        }
+        state.cart.push({ ...product, quantity: caseQty, brand: productBrand, caseQty: caseQty, promoMessage: product.promo || null });
       }
       showToast(`Added ${product.sku} to cart`);
       render();
