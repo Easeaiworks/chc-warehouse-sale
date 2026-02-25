@@ -1196,7 +1196,10 @@ app.post('/api/auth/verify', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   try {
     const rawShopName = req.body.shopName;
+    const rawContactName = req.body.contactName;
+    const rawPhone = req.body.phone;
     const rawEmail = req.body.email;
+    const rawAddress = req.body.address;
     const rawBranch = req.body.branch;
     const items = req.body.items;
     const total = req.body.total;
@@ -1209,7 +1212,10 @@ app.post('/api/orders', async (req, res) => {
 
     // Sanitize text inputs
     const shopName = sanitize(rawShopName);
+    const contactName = rawContactName ? sanitize(rawContactName) : '';
+    const phone = rawPhone ? sanitize(rawPhone) : '';
     const email = sanitize(rawEmail);
+    const address = rawAddress ? sanitize(rawAddress) : '';
     const branch = sanitize(rawBranch);
 
     // Validate email
@@ -1246,7 +1252,10 @@ app.post('/api/orders', async (req, res) => {
     const orderData = {
       order_code: orderCode,
       shop_name: shopName,
+      contact_name: contactName,
+      phone,
       email,
+      address,
       branch,
       items: sanitizedItems,
       total: parseFloat(total),
@@ -1318,12 +1327,13 @@ async function sendOrderEmail(order) {
     }
     let promoHtml = '';
     if (item.promoMessage) {
-      promoHtml = `<tr><td colspan="4" style="padding: 2px 8px 8px; font-size: 11px; color: #f97316; font-weight: bold;">&#9733; ${item.promoMessage}</td></tr>`;
+      promoHtml = `<tr><td colspan="5" style="padding: 2px 8px 8px; font-size: 11px; color: #f97316; font-weight: bold;">&#9733; ${item.promoMessage}</td></tr>`;
     }
     return `
       <tr style="border-bottom: 1px solid #e2e8f0;">
         <td style="padding: 8px; font-family: monospace; color: #2563eb; font-size: 13px;">${item.sku}</td>
         <td style="padding: 8px; font-size: 13px;">${item.name}</td>
+        <td style="padding: 8px; text-align: right;">$${parseFloat(item.salePrice).toFixed(2)}</td>
         <td style="padding: 8px; text-align: center;">${qtyDisplay}</td>
         <td style="padding: 8px; text-align: right; font-weight: bold; color: #16a34a;">$${lineTotal}</td>
       </tr>
@@ -1346,8 +1356,8 @@ New Warehouse Sale Order
 ========================
 
 Order ID: ${order.order_code}
-Shop Name: ${order.shop_name}
-Contact Email: ${order.email}
+Shop Name: ${order.shop_name}${order.contact_name ? `\nContact: ${order.contact_name}` : ''}${order.phone ? `\nPhone: ${order.phone}` : ''}
+Contact Email: ${order.email}${order.address ? `\nAddress: ${order.address}` : ''}
 Branch: ${order.branch}
 Date: ${new Date(order.created_at).toLocaleString()}
 
@@ -1368,7 +1378,10 @@ This order was submitted via the CHC Paint Warehouse Sale catalog.
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
             <tr><td style="padding: 8px 0; color: #64748b; width: 140px;">Order ID</td><td style="padding: 8px 0; font-weight: bold;">${order.order_code}</td></tr>
             <tr><td style="padding: 8px 0; color: #64748b;">Shop Name</td><td style="padding: 8px 0; font-weight: bold;">${order.shop_name}</td></tr>
+            ${order.contact_name ? `<tr><td style="padding: 8px 0; color: #64748b;">Contact Name</td><td style="padding: 8px 0;">${order.contact_name}</td></tr>` : ''}
+            ${order.phone ? `<tr><td style="padding: 8px 0; color: #64748b;">Phone</td><td style="padding: 8px 0;">${order.phone}</td></tr>` : ''}
             <tr><td style="padding: 8px 0; color: #64748b;">Contact Email</td><td style="padding: 8px 0;">${order.email}</td></tr>
+            ${order.address ? `<tr><td style="padding: 8px 0; color: #64748b;">Address</td><td style="padding: 8px 0;">${order.address}</td></tr>` : ''}
             <tr><td style="padding: 8px 0; color: #64748b;">Branch</td><td style="padding: 8px 0; font-weight: bold;">${order.branch}</td></tr>
             <tr><td style="padding: 8px 0; color: #64748b;">Date</td><td style="padding: 8px 0;">${new Date(order.created_at).toLocaleString()}</td></tr>
           </table>
@@ -1378,6 +1391,7 @@ This order was submitted via the CHC Paint Warehouse Sale catalog.
               <tr style="background: #f8fafc;">
                 <th style="text-align: left; padding: 8px; font-size: 12px; color: #64748b;">SKU</th>
                 <th style="text-align: left; padding: 8px; font-size: 12px; color: #64748b;">Product</th>
+                <th style="text-align: right; padding: 8px; font-size: 12px; color: #64748b;">Unit Price</th>
                 <th style="text-align: center; padding: 8px; font-size: 12px; color: #64748b;">Qty</th>
                 <th style="text-align: right; padding: 8px; font-size: 12px; color: #64748b;">Total</th>
               </tr>

@@ -981,10 +981,14 @@
           body: JSON.stringify({
             orderId,
             shopName: state.shopName,
+            contactName: state.contactName,
+            phone: state.phone,
             email: state.contactEmail,
+            address: state.address,
             branch: state.branch,
             items: state.cart,
-            total: getCartTotal()
+            total: getCartTotal(),
+            orderNotes: state.orderNotes || ''
           })
         });
         return await response.json();
