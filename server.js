@@ -1244,7 +1244,7 @@ app.post('/api/orders', async (req, res) => {
       salePrice: parseFloat(item.salePrice) || 0,
       brand: sanitize(String(item.brand || '')),
       caseQty: Math.max(1, parseInt(item.caseQty) || 1),
-      promoMessage: item.promoMessage ? sanitize(String(item.promoMessage)).substring(0, 200) : null
+      promoMessage: (item.promoMessage || item.promo) ? sanitize(String(item.promoMessage || item.promo)).substring(0, 200) : null
     }));
 
     const orderCode = `ORD-${Date.now().toString(36).toUpperCase()}`;
