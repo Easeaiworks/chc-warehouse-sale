@@ -1204,7 +1204,7 @@ app.post('/api/orders', async (req, res) => {
     const items = req.body.items;
     const total = req.body.total;
     const sale_id = req.body.sale_id;
-    const rawOrderNotes = req.body.orderNotes;
+    const rawOrderNotes = req.body.orderNotes || req.body.notes;
 
     if (!rawShopName || !rawEmail || !rawBranch || !items || items.length === 0) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -1236,15 +1236,18 @@ app.post('/api/orders', async (req, res) => {
     // Sanitize order notes
     const orderNotes = rawOrderNotes ? sanitize(String(rawOrderNotes)).substring(0, 1000) : '';
 
-    // Sanitize each item
+    // Sanitize each item (supports new formattedItems structure from frontend)
     const sanitizedItems = items.map(item => ({
       sku: sanitize(String(item.sku || '')),
       name: sanitize(String(item.name || '')),
       quantity: Math.max(1, Math.min(9999, parseInt(item.quantity) || 1)),
-      salePrice: parseFloat(item.salePrice) || 0,
+      salePrice: parseFloat(item.unitPrice || item.salePrice) || 0,
+      lineTotal: parseFloat(item.lineTotal) || null,
+      paidUnits: parseInt(item.paidUnits) || null,
+      freeUnits: parseInt(item.freeUnits) || 0,
       brand: sanitize(String(item.brand || '')),
       caseQty: Math.max(1, parseInt(item.caseQty) || 1),
-      promoMessage: (item.promoMessage || item.promo) ? sanitize(String(item.promoMessage || item.promo)).substring(0, 200) : null
+      promoMessage: (item.promo || item.promoMessage) ? sanitize(String(item.promo || item.promoMessage)).substring(0, 200) : null
     }));
 
     const orderCode = `ORD-${Date.now().toString(36).toUpperCase()}`;
@@ -1302,28 +1305,26 @@ async function sendOrderEmail(order) {
   const branchEmail = BRANCH_EMAILS[order.branch];
   if (!branchEmail) return;
 
-  // Build plain text items with case qty and promo info
+  // Build plain text items with promo info
   const itemsText = order.items.map(item => {
-    const caseQty = item.caseQty || 1;
-    const numCases = Math.floor(item.quantity / caseQty);
-    const lineTotal = (parseFloat(item.salePrice) * item.quantity).toFixed(2);
+    const lineTotal = item.lineTotal ? parseFloat(item.lineTotal).toFixed(2) : (parseFloat(item.salePrice) * item.quantity).toFixed(2);
     let line = `${item.sku} - ${item.name}\n    $${parseFloat(item.salePrice).toFixed(2)}/ea | Qty: ${item.quantity}`;
-    if (caseQty > 1) line += ` (${numCases} case${numCases !== 1 ? 's' : ''} x ${caseQty})`;
+    if (item.paidUnits && item.paidUnits < item.quantity) {
+      line += ` (Pay for ${item.paidUnits}, ${item.freeUnits || 0} FREE)`;
+    }
     line += ` | Total: $${lineTotal}`;
-    if (item.promoMessage) line += `\n    *** PROMO: ${item.promoMessage} - Already included ***`;
+    if (item.promoMessage) line += `\n    *** PROMO: ${item.promoMessage} ***`;
     return line;
   }).join('\n\n');
 
   const notesText = order.notes ? `\n\n--- CUSTOMER NOTES ---\n${order.notes}\n----------------------` : '';
 
-  // Build HTML item rows with case qty and promo info
+  // Build HTML item rows with promo info
   const itemRowsHtml = order.items.map(item => {
-    const caseQty = item.caseQty || 1;
-    const numCases = Math.floor(item.quantity / caseQty);
-    const lineTotal = (parseFloat(item.salePrice) * item.quantity).toFixed(2);
+    const lineTotal = item.lineTotal ? parseFloat(item.lineTotal).toFixed(2) : (parseFloat(item.salePrice) * item.quantity).toFixed(2);
     let qtyDisplay = `${item.quantity}`;
-    if (caseQty > 1) {
-      qtyDisplay += `<br><span style="font-size: 11px; color: #64748b;">${numCases} case${numCases !== 1 ? 's' : ''} &times; ${caseQty}</span>`;
+    if (item.paidUnits && item.paidUnits < item.quantity) {
+      qtyDisplay += `<br><span style="font-size: 11px; color: #64748b;">pay ${item.paidUnits}, ${item.freeUnits || 0} free</span>`;
     }
     let promoHtml = '';
     if (item.promoMessage) {
@@ -1404,7 +1405,8 @@ This order was submitted via the CHC Paint Warehouse Sale catalog.
           <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin-top: 16px; text-align: right;">
             <span style="font-size: 18px; font-weight: bold; color: #16a34a;">Order Total: $${parseFloat(order.total).toFixed(2)}</span>
           </div>
-          <p style="margin-top: 16px; color: #94a3b8; font-size: 12px; text-align: center;">
+          <p style="margin-top: 12px; color: #64748b; font-size: 12px;">* Prices quoted before Ontario HST</p>
+          <p style="margin-top: 8px; color: #94a3b8; font-size: 12px; text-align: center;">
             This order was submitted via the CHC Paint Warehouse Sale catalog.
           </p>
         </div>
