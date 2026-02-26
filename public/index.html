@@ -445,7 +445,10 @@
             { sku: "JR556", name: "Shop-Line Low VOC Slow Reducer Ga", previousPrice: "170.98", salePrice: "85.49" },
             { sku: "SC310/01", name: "Shop-Line Low VOC Slow Reducer Ga", previousPrice: "99.99", salePrice: "74.99" },
             { sku: "SH311/04", name: "PPG Super Value Fast Hardener", previousPrice: "54.99", salePrice: "41.24" },
-            { sku: "SH312/04", name: "PPG Super Value Slow Hardener", previousPrice: "54.99", salePrice: "41.24" }
+            { sku: "SH312/04", name: "PPG Super Value Slow Hardener", previousPrice: "54.99", salePrice: "41.24" },
+            { sku: "JH7210/04", name: "Shop-Line 2.1VOC European Activator Fast Qt", previousPrice: "108.22", salePrice: "54.11" },
+            { sku: "JH7220/04", name: "Shop-Line 2.1VOC European Activator Slow Qt", previousPrice: "108.22", salePrice: "54.11" },
+            { sku: "JH7230/04", name: "Shop-Line 2.1 VOC European Activator Extra Slow Qt", previousPrice: "108.22", salePrice: "54.11" }
           ],
           "Shop Supplies": [
             { sku: "AL84-0314", name: "PPG Single Edge Razor Blades 100/pk", previousPrice: "9.49", salePrice: "4.99" },
@@ -469,9 +472,6 @@
           ],
           "Specialty Products": [
             { sku: "EPW115", name: "2L WB SPEED PRIME GRAY", previousPrice: "345.78", salePrice: "172.89" },
-            { sku: "JH7210/04", name: "Shop-Line 2.1VOC European Activator Fast Qt", previousPrice: "108.22", salePrice: "54.11" },
-            { sku: "JH7220/04", name: "Shop-Line 2.1VOC European Activator Slow Qt", previousPrice: "108.22", salePrice: "54.11" },
-            { sku: "JH7230/04", name: "Shop-Line 2.1 VOC European Activator Extra Slow Qt", previousPrice: "108.22", salePrice: "54.11" },
             { sku: "SL93LV", name: "OneChoice Low VOC Accelerator", previousPrice: "132.19", salePrice: "79.31" },
             { sku: "SLV4985", name: "OneChoice Universal Flattening Agent Qt", previousPrice: "242.46", salePrice: "145.48" },
             { sku: "SLV73", name: "OneChoice Fish Eye Eliminator Pt", previousPrice: "111.23", salePrice: "66.74" },
@@ -708,12 +708,12 @@
       return state.cart.reduce((sum, item) => {
         const promo = PROMO_RULES[item.sku];
         if (promo && promo.type === "per_case") {
-          // For per_case promos, customer only pays for 'pay' items per case
+          // For per_case promos, customer pays list price for 'pay' items per case
           const caseQty = getCaseQty(item.sku);
           const numCases = Math.floor(item.quantity / caseQty);
           const remainder = item.quantity % caseQty;
           const paidUnits = (numCases * promo.pay) + remainder;
-          return sum + parseFloat(item.salePrice) * paidUnits;
+          return sum + parseFloat(item.previousPrice) * paidUnits;
         }
         return sum + parseFloat(item.salePrice) * item.quantity;
       }, 0);
@@ -726,7 +726,8 @@
         const numCases = Math.floor(item.quantity / caseQty);
         const remainder = item.quantity % caseQty;
         const paidUnits = (numCases * promo.pay) + remainder;
-        return parseFloat(item.salePrice) * paidUnits;
+        // Use previousPrice (list price) for per_case promo items
+        return parseFloat(item.previousPrice) * paidUnits;
       }
       return parseFloat(item.salePrice) * item.quantity;
     }
@@ -809,12 +810,12 @@
 
 
     // Calculate effective price for per_case promos
-    function getEffectivePrice(sku, salePrice) {
+    function getEffectivePrice(sku, previousPrice) {
       const promo = PROMO_RULES[sku];
       if (promo && promo.type === "per_case") {
-        return (parseFloat(salePrice) * promo.pay) / promo.get;
+        return (parseFloat(previousPrice) * promo.pay) / promo.get;
       }
-      return parseFloat(salePrice);
+      return parseFloat(previousPrice);
     }
 
     // Get promo info for cart/email display
@@ -1459,13 +1460,14 @@
       const promo = PROMO_RULES[product.sku];
       const isPerCase = promo && promo.type === "per_case";
       
-      // Calculate effective price for per_case promos
-      const effectivePrice = getEffectivePrice(product.sku, product.salePrice);
+      // Calculate effective price for per_case promos (based on list price)
+      const effectivePrice = getEffectivePrice(product.sku, product.previousPrice);
       const effectiveDisc = isPerCase ? getDiscount(product.previousPrice, effectivePrice) : discount;
       
       // Build price display
       let priceHtml = '';
       if (isPerCase) {
+        const caseTotalPaid = parseFloat(product.previousPrice) * promo.pay;
         priceHtml = `
           <div class="flex flex-col gap-1">
             <div class="flex items-center gap-2 flex-wrap">
@@ -1473,7 +1475,7 @@
               <span class="text-xs text-slate-500">effective/ea</span>
               ${effectiveDisc > 0 ? `<span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">${effectiveDisc}% OFF</span>` : ''}
             </div>
-            <div class="text-xs text-slate-400">List: $${formatPrice(product.salePrice)}/ea × ${promo.pay} paid = $${formatPrice(parseFloat(product.salePrice) * promo.pay)}/case</div>
+            <div class="text-xs text-slate-400">List: $${formatPrice(product.previousPrice)}/ea × ${promo.pay} paid = $${formatPrice(caseTotalPaid)} for ${promo.get}</div>
           </div>`;
       } else {
         priceHtml = `
