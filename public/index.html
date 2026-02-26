@@ -724,8 +724,7 @@
         const numCases = Math.floor(item.quantity / caseQty);
         const remainder = item.quantity % caseQty;
         const paidUnits = (numCases * promo.pay) + remainder;
-        // Use previousPrice (list price) for per_case promo items
-        return parseFloat(item.previousPrice) * paidUnits;
+        return parseFloat(item.salePrice) * paidUnits;
       }
       return parseFloat(item.salePrice) * item.quantity;
     }
@@ -808,12 +807,12 @@
 
 
     // Calculate effective price for per_case promos
-    function getEffectivePrice(sku, previousPrice) {
+    function getEffectivePrice(sku, salePrice) {
       const promo = PROMO_RULES[sku];
       if (promo && promo.type === "per_case") {
-        return (parseFloat(previousPrice) * promo.pay) / promo.get;
+        return (parseFloat(salePrice) * promo.pay) / promo.get;
       }
-      return parseFloat(previousPrice);
+      return parseFloat(salePrice);
     }
 
     // Get promo info for cart/email display
@@ -1458,14 +1457,14 @@
       const promo = PROMO_RULES[product.sku];
       const isPerCase = promo && promo.type === "per_case";
       
-      // Calculate effective price for per_case promos (based on list price)
-      const effectivePrice = getEffectivePrice(product.sku, product.previousPrice);
+      // Calculate effective price for per_case promos (based on sale price)
+      const effectivePrice = getEffectivePrice(product.sku, product.salePrice);
       const effectiveDisc = isPerCase ? getDiscount(product.previousPrice, effectivePrice) : discount;
       
       // Build price display
       let priceHtml = '';
       if (isPerCase) {
-        const caseTotalPaid = parseFloat(product.previousPrice) * promo.pay;
+        const caseTotalPaid = parseFloat(product.salePrice) * promo.pay;
         priceHtml = `
           <div class="flex flex-col gap-1">
             <div class="flex items-center gap-2 flex-wrap">
@@ -1473,7 +1472,7 @@
               <span class="text-xs text-slate-500">effective/ea</span>
               ${effectiveDisc > 0 ? `<span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">${effectiveDisc}% OFF</span>` : ''}
             </div>
-            <div class="text-xs text-slate-400">List: $${formatPrice(product.previousPrice)}/ea × ${promo.pay} paid = $${formatPrice(caseTotalPaid)} for ${promo.get}</div>
+            <div class="text-xs text-slate-400">$${formatPrice(product.salePrice)}/ea × ${promo.pay} paid = $${formatPrice(caseTotalPaid)} for ${promo.get}</div>
           </div>`;
       } else {
         priceHtml = `
